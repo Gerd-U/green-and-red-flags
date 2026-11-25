@@ -8,6 +8,7 @@ import { randomProfileLine, sanitizeProfileLine } from '../data/profiles'
 import { randomAvatar, sanitizeAvatar } from '../lib/avatar'
 import { roundConfig, TOTAL_ROUNDS } from '../lib/game'
 import { mainTopic, normalizeCode, openChannel, playerTopic, type Room } from '../lib/room'
+import { isSfxOn, playSfx, setSfxOn, unlockAudio } from '../lib/sfx'
 import { getPlayerId, load, save } from '../lib/storage'
 import type {
   AvatarConfig,
@@ -53,17 +54,20 @@ export default function Play() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const slot = params.get('pid') ? `.${params.get('pid')}` : ''
+  // dev-only bot player (used by /dev/bots to simulate a full class)
+  const bot = import.meta.env.DEV && params.get('bot') === '1'
   const me = useMemo(() => getPlayerId(slot), [slot])
   const saved = useMemo(() => load<Profile | null>('gr.profile' + slot, null), [slot])
 
   const urlRoom = normalizeCode(params.get('room'))
   const [room, setRoom] = useState(urlRoom || saved?.room || '')
-  const [name, setName] = useState(saved?.name ?? '')
+  const [name, setName] = useState(saved?.name ?? (bot ? `Bot ${slot.replace(/\D/g, '')}` : ''))
   // sanitizeAvatar turns old (polygon) saves into a new random person
   const [avatar, setAvatar] = useState<AvatarConfig>(() => (saved?.avatar ? sanitizeAvatar(saved.avatar) : randomAvatar()))
   const [bio, setBio] = useState<string>(() => (saved?.bio ? sanitizeProfileLine(saved.bio) : randomProfileLine()))
-  const [ready, setReady] = useState(Boolean(saved?.ready && saved.room === room && saved.avatar))
+  const [ready, setReady] = useState(bot || Boolean(saved?.ready && saved.room === room && saved.avatar))
   const [step, setStep] = useState<Step>(() => {
+    if (bot && room) return 'room'
     if (!room || !name) return 'join'
     if (saved?.ready && saved.room === room && saved.avatar) return 'room'
     return 'editor'
@@ -155,6 +159,7 @@ export default function Play() {
       avatar={avatar}
       bio={bio}
       ready={ready}
+      bot={bot}
       onEdit={() => {
         setReady(false)
         setStep('editor')
@@ -176,6 +181,7 @@ interface RoomProps {
   avatar: AvatarConfig
   bio: string
   ready: boolean
+  bot: boolean
   onEdit: () => void
   onLeave: () => void
 }
@@ -196,7 +202,7 @@ function useCountdown(ms: number | undefined, seq: number | undefined, paused = 
   return Math.max(0, left)
 }
 
-function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: RoomProps) {
+function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }: RoomProps) {
   const [status, setStatus] = useState('connecting')
   const [state, setState] = useState<GameState | null>(null)
   const [players, setPlayers] = useState<PlayerInfo[]>([])
@@ -207,6 +213,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
   const [pendingPowers, setPendingPowers] = useState<PowerId[]>([])
   const [tilt, setTilt] = useState(false)
   const [votedKey, setVotedKey] = useState<string | null>(null)
+  const [soundOn, setSound] = useState(isSfxOn())
   const mainRef = useRef<Room | null>(null)
   const mineRef = useRef<Room | null>(null)
   const lastSeq = useRef(-1)
@@ -296,8 +303,38 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
   const sendMiss = useCallback((m: MissMsg) => mineRef.current?.send('miss', m), [])
   const gotPower = useCallback((p: PowerId) => setPendingPowers((list) => [...list, p]), [])
 
+  useEffect(() => {
+    document.addEventListener('pointerdown', unlockAudio)
+    return () => document.removeEventListener('pointerdown', unlockAudio)
+  }, [])
+
   const onFeedback = useCallback(
     (f: GameFeedback) => {
+      switch (f.type) {
+        case 'green':
+          playSfx(f.streak === 3 ? 'combo' : 'green', { level: Math.min(f.streak, 3) })
+          break
+        case 'countdown':
+          playSfx(f.n > 0 ? 'countdown' : 'go')
+          break
+        case 'power':
+          playSfx(f.power === 'therapy' ? 'shield' : 'announce')
+          break
+        case 'shield-used':
+          playSfx('shield')
+          break
+        case 'sabotaged':
+          playSfx('sabotage')
+          break
+        case 'heartbroken-over':
+          playSfx('soulmate')
+          break
+        case 'end':
+          playSfx('roundEnd')
+          break
+        default:
+          playSfx(f.type)
+      }
       if (f.type === 'sabotaged') {
         const p = POWERS[f.power]
         showToast(`${nameOf(f.from)} used ${p.name.toUpperCase()} on you! ${p.emoji}`, p.color)
@@ -358,7 +395,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
       const list = playersRef.current.filter((p) => p.id !== me)
       if (list.length) sendPower(list[Math.floor(Math.random() * list.length)].id)
       else setPendingPowers((l) => l.slice(1))
-    }, 7000)
+    }, bot ? 600 + Math.random() * 1500 : 7000)
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPowers])
@@ -367,6 +404,17 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
   useEffect(() => {
     if (phase && phase !== 'playing' && phase !== 'defense') setPendingPowers([])
   }, [phase])
+
+  // bots vote randomly after a short delay
+  useEffect(() => {
+    if (!bot || !defense || defense.stage !== 'vote' || defense.playerId === me || votedKey === defense.key) return
+    const key = defense.key
+    const t = setTimeout(() => {
+      mineRef.current?.send('vote', { id: me, vote: Math.random() < 0.55 ? 'convinced' : 'not', defenseKey: key })
+      setVotedKey(key)
+    }, 500 + Math.random() * 3000)
+    return () => clearTimeout(t)
+  }, [bot, defense, me, votedKey])
 
   const vote = (v: 'convinced' | 'not') => {
     if (!defense) return
@@ -396,6 +444,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
           sabotage={sabotage}
           grant={grant}
           tilt={tilt}
+          bot={bot}
           onTick={sendTick}
           onCatch={sendCatch}
           onMiss={sendMiss}
@@ -452,6 +501,17 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
           📱 Tilt {tilt ? 'ON' : 'OFF'}
         </button>
       )}
+      <button
+        className={`sound-btn ${inRound ? 'in-game' : ''}`}
+        onClick={() => {
+          unlockAudio()
+          setSfxOn(!soundOn)
+          setSound(!soundOn)
+        }}
+        aria-label={soundOn ? 'Mute sounds' : 'Turn sounds on'}
+      >
+        {soundOn ? '🔊' : '🔇'}
+      </button>
 
       {/* sabotage target picker */}
       {pendingPowers.length > 0 && phase === 'playing' && (

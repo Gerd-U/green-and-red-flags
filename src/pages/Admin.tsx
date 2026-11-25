@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import PolyBackground from '../components/PolyBackground'
+import RoundBackdrop from '../components/RoundBackdrop'
 import Tutorial from '../components/Tutorial'
 import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, roundConfig, START_HEARTS, TOTAL_ROUNDS } from '../lib/game'
 import { makeRoomCode } from '../lib/room'
+import { duckMusic, isMusicOn, isSfxOn, playSfx, setMusicOn, setMusicTempo, setSfxOn, startMusic, stopMusic, unlockAudio } from '../lib/sfx'
 import LiveGrid from '../admin/LiveGrid'
 import { Announcer, AwardsShow, DefenseView, Lobby, Podium, Ranking, RoundResults, SabotageAnim, type RankRow } from '../admin/Panels'
 import { clearAdminSnapshot, loadAdminSnapshot, useAdminGame } from '../admin/useAdminGame'
@@ -58,13 +60,65 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
   const autoLeft = auto ? (auto.paused ? auto.pausedLeft : Math.max(0, auto.endsAt - now)) : 0
   const activity = Date.now() - game.createdAt
 
+  // ---- sound ----
+  const [musicOn, setMusic] = useState(isMusicOn())
+  const [sfxOn, setSfx] = useState(isSfxOn())
+  useEffect(() => {
+    const unlock = () => {
+      unlockAudio()
+      if (isMusicOn()) startMusic()
+    }
+    document.addEventListener('pointerdown', unlock)
+    return () => {
+      document.removeEventListener('pointerdown', unlock)
+      stopMusic()
+    }
+  }, [])
+  const bpm = game.phase === 'lobby' || game.phase === 'tutorial' ? 100 : [108, 120, 134][Math.max(0, game.round - 1)] ?? 112
+  useEffect(() => setMusicTempo(bpm), [bpm])
+  const talking = game.phase === 'defense' && game.defense?.stage !== 'result'
+  const discussing = game.phase === 'roundEnd'
+  useEffect(() => duckMusic(talking || discussing), [talking, discussing])
+  // phase / countdown / announcement sounds
+  const prev = useRef({ phase: game.phase, countdown: 0, ann: -1, award: -1, stage: '' })
+  const awardIdx = game.phase === 'awards' && auto ? Math.floor(Math.max(0, Math.max(1, game.awards?.length ?? 0) * AWARD_SHOW_MS + 1500 - autoLeft) / AWARD_SHOW_MS) : -1
+  useEffect(() => {
+    const p = prev.current
+    if (countdown !== p.countdown) {
+      if (countdown > 0) playSfx('countdown')
+      else if (p.countdown === 1) playSfx('go')
+      p.countdown = countdown
+    }
+    if (game.phase !== p.phase) {
+      if (game.phase === 'defense') playSfx('defense')
+      if (game.phase === 'roundEnd') playSfx('roundEnd')
+      if (game.phase === 'podium') playSfx('award')
+      p.phase = game.phase
+    }
+    const stage = game.defense?.stage ?? ''
+    if (stage !== p.stage) {
+      if (stage === 'vote') playSfx('vote')
+      if (stage === 'result') playSfx(game.defense?.result === 'convinced' ? 'soulmate' : 'red')
+      p.stage = stage
+    }
+    if (awardIdx !== p.award) {
+      if (awardIdx >= 0) playSfx('award')
+      p.award = awardIdx
+    }
+    const a = announcements[0]
+    if (a && a.key !== p.ann) {
+      p.ann = a.key
+      playSfx(a.sfx)
+    }
+  })
+
   const confirmNewRoom = () => {
     if (window.confirm('Start a brand new room? Players will need the new code.')) onNewRoom()
   }
 
   return (
-    <div className={`screen admin ${inRound || game.phase === 'roundEnd' ? `theme-${cfg.theme}` : ''}`}>
-      <PolyBackground />
+    <div className={`screen admin ${inRound || game.phase === 'roundEnd' ? `themed theme-${cfg.theme}` : ''}`}>
+      {inRound || game.phase === 'roundEnd' ? <RoundBackdrop theme={cfg.theme} className="admin-bd" /> : <PolyBackground />}
       <header className="admin-bar">
         <div className="admin-brand">
           <span className="g">Green</span>&amp;<span className="r">Red</span> Flags
@@ -135,6 +189,29 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
               Play again
             </button>
           )}
+          <button
+            className={`btn btn-ghost small ${musicOn ? '' : 'off'}`}
+            onClick={() => {
+              unlockAudio()
+              setMusicOn(!musicOn)
+              setMusic(!musicOn)
+              if (!musicOn) startMusic(bpm)
+            }}
+            title="Background music"
+          >
+            {musicOn ? '🎵' : '🔇'}
+          </button>
+          <button
+            className={`btn btn-ghost small ${sfxOn ? '' : 'off'}`}
+            onClick={() => {
+              unlockAudio()
+              setSfxOn(!sfxOn)
+              setSfx(!sfxOn)
+            }}
+            title="Sound effects"
+          >
+            {sfxOn ? '🔊' : '🔈'}
+          </button>
           <button className="btn btn-ghost small" onClick={confirmNewRoom} title="Create a new room code">
             New room
           </button>

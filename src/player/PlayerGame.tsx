@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import Avatar from '../components/Avatar'
+import RoundBackdrop from '../components/RoundBackdrop'
 import { POWERS } from '../data/cards'
 import {
   buildSchedule,
@@ -84,6 +85,8 @@ interface Props {
   sabotage: SabotageEvent | null
   grant: GrantEvent | null
   tilt: boolean
+  /** dev-only autopilot */
+  bot?: boolean
   onTick: (t: Tick) => void
   onCatch: (m: CatchMsg) => void
   onMiss: (m: MissMsg) => void
@@ -93,7 +96,7 @@ interface Props {
 
 const fmtPts = (n: number) => (n > 0 ? `+${Math.round(n)}` : `${Math.round(n)}`)
 
-export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, onTick, onCatch, onMiss, onPower, onFeedback }: Props) {
+export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, bot = false, onTick, onCatch, onMiss, onPower, onFeedback }: Props) {
   const round = state.round
   const cfg = roundConfig(round)
   const schedule = useMemo(() => buildSchedule(state.seed, round, state.gameSeed), [state.seed, round, state.gameSeed])
@@ -286,6 +289,22 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, o
         fb({ type: 'heartbroken-over' })
       }
       const broken = s.hbUntil > 0
+
+      // dev bot: walk to greens, away from reds (and make mistakes sometimes)
+      if (bot) {
+        const target = s.active
+          .filter((a) => a.y < PLAYER_Y && a.y > 0.25)
+          .sort((a, b) => b.y - a.y)[0]
+        let want = s.x
+        if (target) {
+          const good = target.card.kind !== 'red' && target.card.kind !== 'ick'
+          const dumb = (target.card.id * 7 + round) % 5 === 0
+          if (good !== dumb) want = target.card.x
+          else if (Math.abs(target.card.x - s.x) < HIT_DX + 0.08) want = target.card.x > 0.5 ? 0.15 : 0.85
+        }
+        input.current.left = want < s.x - 0.03
+        input.current.right = want > s.x + 0.03
+      }
 
       // movement
       s.moving = false
@@ -519,6 +538,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, o
         onPointerUp={swipeEnd}
         onPointerCancel={() => (input.current.swipe = null)}
       >
+        <RoundBackdrop theme={cfg.theme} className="field-bd" />
         {s.active.map((a) => {
           const c = a.card
           let look: string = c.kind

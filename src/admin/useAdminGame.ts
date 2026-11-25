@@ -21,6 +21,7 @@ import {
   TUTORIAL_MS,
 } from '../lib/game'
 import { randomSeed } from '../lib/rng'
+import type { Sfx } from '../lib/sfx'
 import { mainTopic, openChannel, playerTopic, type Room } from '../lib/room'
 import { load, save } from '../lib/storage'
 import type {
@@ -69,6 +70,7 @@ export interface Announcement {
   text: string
   sub?: string
   color: string
+  sfx: Sfx
 }
 
 interface AdminDefense extends Defense {
@@ -210,8 +212,8 @@ export function useAdminGame(code: string) {
 
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
-  const announce = useCallback((text: string, color: string, sub?: string) => {
-    setAnnouncements((list) => [...list, { key: annKey.current++, text, sub, color }].slice(-3))
+  const announce = useCallback((text: string, color: string, sub?: string, sfx: Sfx = 'announce') => {
+    setAnnouncements((list) => [...list, { key: annKey.current++, text, sub, color, sfx }].slice(-3))
   }, [])
 
   const elapsed = useCallback(() => {
@@ -545,17 +547,17 @@ export function useAdminGame(code: string) {
       }
       if (performance.now() - lastToxic.current > 2500) {
         lastToxic.current = performance.now()
-        announce('TOXIC!', '#ff3b5c', `${name}: “${m.text}”`)
+        announce('TOXIC!', '#ff3b5c', `${name}: “${m.text}”`, 'red')
       }
     } else if (m.kind === 'green' && m.streak === MAX_STREAK_LEVEL) {
-      announce('HUSBAND/WIFE MATERIAL!', '#22c55e', `${name} is on a x3 combo`)
+      announce('HUSBAND/WIFE MATERIAL!', '#22c55e', `${name} is on a x3 combo`, 'combo')
     } else if (m.kind === 'soulmate') {
-      announce('SOULMATE!', '#ffd23f', `${name}: “${m.text}”`)
+      announce('SOULMATE!', '#ffd23f', `${name}: “${m.text}”`, 'soulmate')
     } else if (m.kind === 'ick' && m.text) {
       inc(s.counters.icks, m.id)
-      announce('THE ICK!', '#a855f7', `${name}: “${m.text}”`)
+      announce('THE ICK!', '#a855f7', `${name}: “${m.text}”`, 'ick')
     }
-    if (m.broke) announce('HEARTBROKEN!', '#ff5fa2', `${name} needs 10 seconds...`)
+    if (m.broke) announce('HEARTBROKEN!', '#ff5fa2', `${name} needs 10 seconds...`, 'red')
   }
 
   const handleMiss = (m: MissMsg) => {
@@ -574,10 +576,10 @@ export function useAdminGame(code: string) {
     inc(s.counters.sent, m.from)
     const shielded = Boolean(ticks.current[m.to]?.cur?.shield)
     if (shielded) {
-      announce('BLOCKED BY THERAPY!', '#22d3ee', `${s.players[m.to].name} was protected`)
+      announce('BLOCKED BY THERAPY!', '#22d3ee', `${s.players[m.to].name} was protected`, 'shield')
     } else {
       inc(s.counters.received, m.to)
-      announce('BETRAYAL!', '#a855f7')
+      announce('BETRAYAL!', '#a855f7', undefined, 'sabotage')
       setSabotages((list) => [...list, ev].slice(-6))
     }
   }
@@ -673,7 +675,7 @@ export function useAdminGame(code: string) {
         if (t >= dur) return fns.endRound()
         if (t >= dur - 10_000 && s.last10Round !== s.round) {
           s.last10Round = s.round
-          announce('LAST 10 SECONDS!', '#ffd23f')
+          announce('LAST 10 SECONDS!', '#ffd23f', undefined, 'last10')
         }
       }
       if (s.phase === 'defense' && s.defense?.stage === 'talk' && now >= s.defense.stageEndsAt) return fns.startVote()
