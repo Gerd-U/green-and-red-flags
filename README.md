@@ -16,10 +16,31 @@ Rutas (nadie las tiene que escribir a mano, salen de la pantalla de inicio):
 ### Antes de empezar
 
 1. En la compu del proyector abro la app y toco **Host a game (big screen)**. Sale la pantalla "Red flags vs Green flags" con el código de sala.
-2. En mi celular abro la app y toco **I'm the host**. Escribo el código de sala y la contraseña de host:
-   - Si definí `VITE_HOST_PASSWORD` (en `.env` o en Vercel), uso esa.
-   - Si no, en la esquina de abajo a la derecha del proyector hay un botón pequeño **Show host PIN**. Lo toco, veo el PIN de 4 dígitos por 6 segundos y se esconde solo.
-3. Listo: en el proyector aparece "🎤 Host". Si mi celular recarga o se bloquea, vuelvo a la vista de host sin escribir nada. **Leave host** cierra la sesión.
+2. En mi celular (Android, con Chrome) abro la app y toco **I'm the host**. Escribo el código de sala y la contraseña de host: **`Alfa12`** (o la que haya puesto en `VITE_HOST_PASSWORD`). Distingue mayúsculas; los espacios al inicio y al final no importan. El proyector nunca la muestra.
+3. Toco **Start hosting**. Ese toque es necesario: Chrome en Android solo deja vibrar y sonar a una página después de que la tocaste.
+4. Listo: en el proyector aparece "🎤 Host" y los botones del proyector se esconden. Si mi celular recarga o se bloquea, vuelvo a la vista de host sin escribir nada (solo vuelvo a tocar **Start hosting**). **Leave host** cierra la sesión.
+
+**La pantalla del celular tiene que quedar encendida durante la actividad.** La app lo pide sola con la Wake Lock API; si el navegador no puede (por ejemplo entrando por `http://192.168…` en la misma wifi), sale el aviso "Keep your screen on" y conviene subir el tiempo de bloqueo de pantalla del celular antes de la clase.
+
+### Señales en el celular (cues)
+
+El celular me avisa sin tener que mirarlo:
+
+| Tipo | Vibración | Color | Cuándo |
+| --- | --- | --- | --- |
+| 🎤 SPEAK (me toca hablar) | una larga | verde | empieza la intro, se abre el lobby, empieza una defensa, resultados de ronda, se revela el Hot Take, termina el tiempo de un speaker, premios, podio y Final thoughts |
+| 👆 ACT (tocar un botón) | dos cortas | amarillo | faltan 5 s de la defensa (Objection o votación), terminó la votación del Hot Take, todos en Ready en el lobby, faltan 5 s de la ronda |
+| ⚠️ WARN | tres cortas | rojo | voy atrasado según el plan, faltan 3 minutos para los 30, se perdió la conexión |
+
+Además del patrón de vibración, el borde de la pantalla parpadea con el color y arriba sale un banner grande con el texto y la pregunta del guion lista. El banner se va con **Got it** o cuando cambia la fase. Abajo quedan los últimos 3 cues por si me perdí uno.
+
+En la vista de host hay switches de **Vibration**, **Flash** y **Cue sound** (un ding bajito, apagado por defecto para que la clase no lo escuche) y un botón **Test cue** que dispara los tres tipos seguidos. Conviene probarlo antes de la clase con el celular en la mano. Si se pierde la conexión con el proyector sale un banner rojo "Disconnected — reconnecting…" hasta que vuelve.
+
+Los cues están en `src/host/cues.ts`: ahí se puede cambiar el texto de cada uno o cuándo se dispara.
+
+### El proyector
+
+Arriba: el logo, la ronda con el tiempo grande y el reloj de la actividad. Abajo: el código de sala, la URL corta y un QR pequeño (en la intro y el lobby el QR va grande en el centro). Mientras el host está conectado, los botones del proyector están escondidos; si muevo el mouse o presiono **H** aparecen 4 segundos en la esquina de abajo a la derecha. Si no hay host conectado, el panel se ve siempre (se puede jugar sin celular de host). **New room…** está en ese panel y pide confirmación.
 
 En mi celular arriba veo el reloj de la actividad, en qué parte vamos y si voy "On time" o atrasado según el plan. Faltando 3 minutos para los 30 sale un aviso rojo. Debajo está el **guion**: lo que digo (Say) y una pregunta para hacer (Ask). Las preguntas usan nombres y tarjetas reales de la partida; con ◀ ▶ veo otra y con **Shuffle** cambio por una de otra persona. **Hide script** lo esconde si solo quiero los botones.
 
@@ -56,7 +77,8 @@ El proyector también tiene todos los botones, por si el host no está conectado
 - **The Ick** (morada): no suma ni resta, solo dispara "THE ICK!" en el proyector y cuenta para el premio.
 - **Poderes**: Gaslighting, Ghosting, Love bombing, Mixed signals y The ex is back duran 5 s y se mandan a otra persona. **Therapy** es un escudo que bloquea el próximo sabotaje.
 - **Dash**: doble toque en una flecha o deslizar rápido el dedo. Tiene 1,2 s de espera.
-- **Defensa**: una por ronda. Si gana "Convinced" (o hay empate) recupera el corazón y los puntos; si no, pierde 100 puntos más.
+- **Entrar tarde**: si alguien entra con la ronda ya empezada, ve "Joining next round" y juega desde la siguiente.
+- **Defensa**: una por ronda. Si la persona que se defiende se desconecta, la defensa se cancela sola y el juego sigue. Si gana "Convinced" (o hay empate) recupera el corazón y los puntos; si no, pierde 100 puntos más.
 
 ## Qué se puede editar
 
@@ -71,10 +93,10 @@ El proyector también tiene todos los botones, por si el host no está conectado
 | --- | --- |
 | `VITE_SUPABASE_URL` | URL del proyecto de Supabase |
 | `VITE_SUPABASE_ANON_KEY` | anon key del proyecto |
-| `VITE_HOST_PASSWORD` | contraseña del host. Si está vacía, el proyector genera un PIN de 4 dígitos al crear la sala. |
+| `VITE_HOST_PASSWORD` | contraseña del host. Si está vacía se usa **`Alfa12`**. |
 | `VITE_LOCAL_REALTIME` | solo para pruebas en una compu sin Supabase (`1`). No ponerla en Vercel. |
 
-La contraseña no viaja por la red: el celular del host manda una prueba calculada con ella y el proyector le responde con un token cifrado. Los comandos del host van por un canal privado y llevan ese token; el proyector ignora cualquier comando sin token válido, así que un jugador no puede controlar el juego aunque conozca el código. Ojo: como es una variable `VITE_`, queda dentro del código de la página, así que es para una clase, no para algo de alta seguridad.
+La contraseña no viaja por la red: el celular del host manda una prueba calculada con ella y el proyector le responde con un token cifrado. Los comandos del host van por un canal privado y llevan ese token; el proyector ignora cualquier comando sin token válido, así que un jugador no puede controlar el juego aunque conozca el código. Ojo: la contraseña por defecto está escrita en el código (y el repo es público), y una variable `VITE_` también queda dentro del código de la página. Alcanza para una clase, no para algo de alta seguridad. Para cambiarla, poné otra en `VITE_HOST_PASSWORD` (en `.env` para local o en las variables de Vercel) y hacé Redeploy.
 
 ## Correrlo en local
 
@@ -102,7 +124,7 @@ Con `VITE_LOCAL_REALTIME=1` en `.env` (o `.env.local`), abrí:
 http://localhost:5173/dev/bots?room=ABCD&n=7&admin=1&host=1
 ```
 
-Arriba se ve el proyector y el celular del host (que entra solo con la contraseña o el PIN), y abajo 7 bots que juegan, votan y mandan sabotajes. El código `room=` tiene que ser el que muestra el proyector. Esta página solo existe con `npm run dev`.
+Arriba se ve el proyector y el celular del host (que entra solo con la contraseña), y abajo 7 bots que juegan, votan y mandan sabotajes. Con `&aw=1280&ah=720` o `&aw=1920&ah=1080` se elige el tamaño del proyector. En modo dev, cada cue del host se registra en la consola como `[cue] SPEAK intro - …`. El código `room=` tiene que ser el que muestra el proyector. Esta página solo existe con `npm run dev`.
 
 Para probar a mano varios jugadores en un navegador: `/play?room=ABCD&pid=2`, `/play?room=ABCD&pid=3`, etc.
 
@@ -119,7 +141,7 @@ El plan gratis permite 100 mensajes por segundo. Cada celular manda unas 7 actua
 ## Desplegar en Vercel
 
 1. En https://vercel.com, "Add New > Project" e importar el repo `green-and-red-flags`.
-2. Antes de darle Deploy, en "Environment Variables" agregar `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y, si quiero contraseña fija, `VITE_HOST_PASSWORD`.
+2. Antes de darle Deploy, en "Environment Variables" agregar `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y, si quiero otra contraseña que no sea `Alfa12`, `VITE_HOST_PASSWORD`.
 3. Deploy. `vercel.json` ya redirige todas las rutas a `index.html`.
 
 Si cambio las variables después, hay que hacer "Redeploy".
