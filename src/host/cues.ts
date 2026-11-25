@@ -62,7 +62,13 @@ const entered = (prev: CueCtx | null, cur: CueCtx, phase: Phase) => prev !== nul
 
 export const CUES: CueDef[] = [
   // ---------------- SPEAK: your turn to talk ----------------
-  { id: 'intro', kind: 'speak', text: () => 'Introduce the topic: red flags vs green flags', when: (p, c) => (entered(p, c, 'intro') ? 'intro' : null) },
+  {
+    id: 'intro',
+    kind: 'speak',
+    text: () => 'Introduce the topic: red flags vs green flags',
+    // also when you tap "Start hosting" and the room is already in the intro
+    when: (p, c) => (c.phase === 'intro' && (p === null || p.phase !== 'intro') ? `intro-${c.activityMs >> 16}` : null),
+  },
   { id: 'lobby', kind: 'speak', text: () => 'Welcome everyone: ask about their dating profiles', when: (p, c) => (entered(p, c, 'lobby') ? 'lobby' : null) },
   {
     id: 'defense',
