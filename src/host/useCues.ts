@@ -43,6 +43,7 @@ export function useCues(info: HostInfo | null, receivedAt: number, connected: bo
   const prev = useRef<CueCtx | null>(null)
   const fired = useRef(new Set<string>())
   const prefsRef = useRef(prefs)
+  const readySince = useRef(0)
   prefsRef.current = prefs
 
   const updatePrefs = (p: Partial<CuePrefs>) => {
@@ -87,6 +88,10 @@ export function useCues(info: HostInfo | null, receivedAt: number, connected: bo
       if (!info) return
       const since = performance.now() - receivedAt
       const cur = cueContext(info, since, connected, planKey)
+      const allReady = cur.phase === 'lobby' && cur.online >= 2 && cur.ready === cur.online
+      if (!allReady) readySince.current = 0
+      else readySince.current ||= performance.now()
+      cur.readyStableMs = allReady ? performance.now() - readySince.current : 0
       const p = prev.current
       const out: FiredCue[] = []
       for (const def of CUES) {

@@ -41,6 +41,8 @@ export interface CueCtx {
   planKey: string
   activityMs: number
   connected: boolean
+  /** ms that everyone in the lobby (2+ people) has been ready without changes */
+  readyStableMs?: number
 }
 
 export interface CueDef {
@@ -106,11 +108,8 @@ export const CUES: CueDef[] = [
     id: 'lobbyReady',
     kind: 'act',
     text: (c) => `Everyone is ready (${c.ready}): start the game`,
-    when: (p, c) => {
-      const all = (x: CueCtx | null) => !!x && x.phase === 'lobby' && x.online > 0 && x.ready === x.online
-      // fires each time the lobby goes from "not all ready" to "all ready"
-      return all(c) && p !== null && !all(p) ? `ready-${c.online}-${c.activityMs >> 14}` : null
-    },
+    // 2+ people and all of them ready for 4 s (fires again if more people join and get ready)
+    when: (p, c) => (p !== null && c.phase === 'lobby' && (c.readyStableMs ?? 0) >= 4000 ? `ready-${c.online}` : null),
   },
   {
     id: 'round5',
