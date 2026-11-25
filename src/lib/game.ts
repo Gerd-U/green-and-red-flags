@@ -11,12 +11,14 @@ export const GREEN_POINTS = 100
 export const RED_PENALTY = 75
 
 // Field geometry (normalized: x by width, y by height)
-export const CARD_W = 0.46
+export const CARD_W = 0.4
 export const CARD_H = 0.12
 export const PLAYER_Y = 0.86
 export const PLAYER_W = 0.2
 export const PLAYER_H = 0.12
 export const SPAWN_Y = -0.1
+/** horizontal distance (card center to player center) that counts as a catch */
+export const HIT_DX = CARD_W * 0.25 + PLAYER_W * 0.25
 
 // Builds the full list of cards for a round. Same seed => same cards,
 // same order and same timing on every phone.
@@ -37,7 +39,7 @@ export function buildSchedule(seed: number): ScheduledCard[] {
     if (r < 0.1 && t > 5000 && t - lastPower > 8000) kind = 'power'
     else if (r < 0.56) kind = 'green'
     else kind = 'red'
-    const x = 0.25 + rand() * 0.5
+    const x = CARD_W / 2 + rand() * (1 - CARD_W)
     const fallMs = 4800 - 1500 * p
     const card: ScheduledCard = { id: id++, t, x, kind, speed: (1 + CARD_H + 0.2) / fallMs }
     if (kind === 'green') card.text = greens[gi++ % greens.length]

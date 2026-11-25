@@ -7,6 +7,7 @@ import {
   CARD_H,
   CARD_W,
   GREEN_POINTS,
+  HIT_DX,
   PLAYER_H,
   PLAYER_W,
   PLAYER_Y,
@@ -28,7 +29,9 @@ import type {
 } from '../lib/types'
 
 const MOVE_SPEED = 1.2 / 1000 // field widths per ms
-const TICK_MS = 100
+// ~7 updates per second: smooth enough with the admin's interpolation and keeps
+// 7 players well under the Supabase free plan limit (100 messages/second).
+const TICK_MS = 140
 
 interface ActiveCard {
   card: ScheduledCard
@@ -204,7 +207,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
           !p.out &&
           bottom >= PLAYER_Y - PLAYER_H / 2 &&
           top <= PLAYER_Y &&
-          Math.abs(a.card.x - s.x) < (CARD_W / 2 + PLAYER_W / 2) * 0.78
+          Math.abs(a.card.x - s.x) < HIT_DX
         if (hit) {
           const c = a.card
           const pop: Popup = { id: s.popId++, x: c.x, text: '', cls: '', at: realNow }

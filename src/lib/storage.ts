@@ -24,11 +24,13 @@ export function remove(key: string): void {
   }
 }
 
-export function getPlayerId(): string {
-  let id = load<string | null>('gr.playerId', null)
+// `slot` lets you test several players in one browser: /play?room=ABCD&pid=2
+export function getPlayerId(slot = ''): string {
+  const key = 'gr.playerId' + slot
+  let id = load<string | null>(key, null)
   if (!id) {
-    id = Math.random().toString(36).slice(2, 10)
-    save('gr.playerId', id)
+    id = Math.random().toString(36).slice(2, 10) + slot.replace('.', '')
+    save(key, id)
   }
   return id
 }

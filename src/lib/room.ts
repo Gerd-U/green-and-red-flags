@@ -1,5 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import { supabase } from './supabase'
+import { createLocalChannel } from './localChannel'
+import { localRealtime, supabase } from './supabase'
 
 // Channel layout
 //  gr-<CODE>            main channel: presence + admin state + sabotage events
@@ -37,14 +38,18 @@ export function openChannel(
   topic: string,
   opts: { presenceKey?: string; onStatus?: (status: ChannelStatus) => void } = {}
 ): Room {
-  if (!supabase) throw new Error('Supabase is not configured')
   const client = supabase
-  const channel = client.channel(topic, {
-    config: {
-      broadcast: { self: false, ack: false },
-      presence: { key: opts.presenceKey ?? '' },
-    },
-  })
+  let channel: RealtimeChannel
+  if (localRealtime || !client) {
+    channel = createLocalChannel(topic, opts.presenceKey ?? '') as unknown as RealtimeChannel
+  } else {
+    channel = client.channel(topic, {
+      config: {
+        broadcast: { self: false, ack: false },
+        presence: { key: opts.presenceKey ?? '' },
+      },
+    })
+  }
   const room: Room = {
     channel,
     ready: false,
@@ -71,7 +76,8 @@ export function openChannel(
     close() {
       room.ready = false
       try {
-        client.removeChannel(channel)
+        if (client && !localRealtime) client.removeChannel(channel)
+        else channel.unsubscribe()
       } catch {
         /* ignore */
       }

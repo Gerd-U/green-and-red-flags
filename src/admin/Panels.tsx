@@ -187,7 +187,7 @@ export function Podium({ rows, stats }: { rows: RankRow[]; stats?: PodiumStats }
               </div>
               <div className="podium-name">{r.player.name}</div>
               <div className="podium-score">{r.score} pts</div>
-              <div className="podium-block" style={{ height: `${heights[i] * 0.42}vh` }}>
+              <div className="podium-block" style={{ height: `${heights[i] * 0.26}vh` }}>
                 <span>{places[i]}</span>
               </div>
             </div>

@@ -119,7 +119,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
 
         {(game.phase === 'playing' || game.phase === 'defense') && (
           <div className="admin-live">
-            <LiveGrid players={gamePlayers} ticks={ticks} lives={game.lives} scores={scores} />
+            <LiveGrid players={gamePlayers} ticks={ticks} lives={game.lives} scores={scores} seed={game.seed} />
             <aside className="side-rank">
               <h3>Ranking</h3>
               <Ranking rows={rows} compact={rows.length > 6} />

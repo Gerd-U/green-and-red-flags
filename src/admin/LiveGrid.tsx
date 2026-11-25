@@ -1,11 +1,11 @@
-import { useEffect, useState, type MutableRefObject } from 'react'
+import { useEffect, useMemo, useState, type MutableRefObject } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { CARD_H, CARD_W, PLAYER_W, PLAYER_Y } from '../lib/game'
+import { buildSchedule, CARD_H, CARD_W, PLAYER_W, PLAYER_Y } from '../lib/game'
 import type { MiniCard, PlayerInfo } from '../lib/types'
 import type { TickBuffer } from './useAdminGame'
 
-const DELAY = 110 // ms of interpolation delay
+const DELAY = 150 // ms of interpolation delay (a bit more than one tick)
 
 function interpolate(buf: TickBuffer | undefined, now: number) {
   if (!buf?.cur) return null
@@ -28,9 +28,12 @@ interface Props {
   ticks: MutableRefObject<Record<string, TickBuffer>>
   lives: Record<string, number>
   scores: Record<string, number>
+  seed: number
 }
 
-export default function LiveGrid({ players, ticks, lives, scores }: Props) {
+export default function LiveGrid({ players, ticks, lives, scores, seed }: Props) {
+  // same seed as the phones -> we know every card's text without sending it
+  const schedule = useMemo(() => buildSchedule(seed), [seed])
   const [, setFrame] = useState(0)
   useEffect(() => {
     let raf = 0
@@ -81,7 +84,9 @@ export default function LiveGrid({ players, ticks, lives, scores }: Props) {
                     width: `${CARD_W * 100}%`,
                     height: `${CARD_H * 100}%`,
                   }}
-                />
+                >
+                  {c.k === 'p' ? POWERS[schedule[c.id]?.power ?? 'ghosting'].emoji : schedule[c.id]?.text}
+                </div>
               ))}
               <div
                 className="mini-char"

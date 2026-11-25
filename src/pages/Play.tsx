@@ -47,8 +47,9 @@ export default function Play() {
   useLockedScreen()
   const nav = useNavigate()
   const [params] = useSearchParams()
-  const me = useMemo(() => getPlayerId(), [])
-  const saved = useMemo(() => load<Profile | null>('gr.profile', null), [])
+  const slot = params.get('pid') ? `.${params.get('pid')}` : ''
+  const me = useMemo(() => getPlayerId(slot), [slot])
+  const saved = useMemo(() => load<Profile | null>('gr.profile' + slot, null), [slot])
 
   const urlRoom = normalizeCode(params.get('room'))
   const [room, setRoom] = useState(urlRoom || saved?.room || '')
@@ -62,9 +63,9 @@ export default function Play() {
   })
 
   useEffect(() => {
-    save('gr.profile', { name, avatar, room, ready } satisfies Profile)
+    save('gr.profile' + slot, { name, avatar, room, ready } satisfies Profile)
     if (room) save('gr.lastRoom', room)
-  }, [name, avatar, room, ready])
+  }, [name, avatar, room, ready, slot])
 
   const submitJoin = (e: FormEvent) => {
     e.preventDefault()
@@ -73,7 +74,7 @@ export default function Play() {
     if (c.length !== 4 || !n) return
     setRoom(c)
     setName(n)
-    nav(`/play?room=${c}`, { replace: true })
+    nav(`/play?room=${c}${slot ? `&pid=${slot.slice(1)}` : ''}`, { replace: true })
     setStep('editor')
   }
 
