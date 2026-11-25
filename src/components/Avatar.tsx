@@ -1,11 +1,21 @@
 import { memo } from 'react'
 import { shade } from '../lib/avatar'
+import type { AvatarConfig, BodyShape, EyeStyle, HatStyle, Mood, MouthStyle, PowerId } from '../lib/types'
+
+type Pt = [number, number]
+interface Shape {
+  pts: Pt[]
+  c: Pt
+  face: number
+  top: number
+  topW: number
+}
 
 // Every avatar is drawn in the same box. The body polygon is split into
 // facets (outer ring + inner fan) and each facet gets a flat shade depending
 // on which way it "faces" a light coming from the top-left: low poly look.
 
-const SHAPES = {
+const SHAPES: Record<BodyShape, Shape> = {
   triangle: { pts: [[60, 30], [113, 134], [7, 134]], c: [60, 98], face: 94, top: 50, topW: 22 },
   square: { pts: [[14, 40], [106, 40], [106, 134], [14, 134]], c: [60, 87], face: 78, top: 40, topW: 46 },
   hexagon: { pts: [[60, 32], [107, 58], [107, 112], [60, 138], [13, 112], [13, 58]], c: [60, 85], face: 78, top: 40, topW: 30 },
@@ -17,30 +27,30 @@ const SHAPES = {
 const INK = '#1b1030'
 const LIGHT = [-0.55, -0.83]
 
-const pts = (arr) => arr.map((p) => p.join(',')).join(' ')
+const pts = (arr: Pt[]): string => arr.map((p) => p.join(',')).join(' ')
 
-function facetShade(cx, cy, tri) {
+function facetShade(cx: number, cy: number, tri: Pt[]): number {
   const mx = (tri[0][0] + tri[1][0] + tri[2][0]) / 3 - cx
   const my = (tri[0][1] + tri[1][1] + tri[2][1]) / 3 - cy
   const len = Math.hypot(mx, my) || 1
   return (mx * LIGHT[0] + my * LIGHT[1]) / len // -1 .. 1
 }
 
-const facetCache = new Map()
-function bodyFacets(body, shape, color) {
-  const key = body + color
-  if (facetCache.has(key)) return facetCache.get(key)
+const facetCache = new Map<string, { p: string; f: string }[]>()
+function bodyFacets(body: string, shape: Shape, color: string) {
+  const cached = facetCache.get(body + color)
+  if (cached) return cached
   const [cx, cy] = shape.c
   const outer = shape.pts
-  const inner = outer.map(([x, y]) => [cx - 3 + (x - cx) * 0.52, cy - 5 + (y - cy) * 0.52])
-  const hub = [cx - 4, cy - 7]
-  const out = []
+  const inner: Pt[] = outer.map(([x, y]) => [cx - 3 + (x - cx) * 0.52, cy - 5 + (y - cy) * 0.52])
+  const hub: Pt = [cx - 4, cy - 7]
+  const out: { p: string; f: string }[] = []
   const n = outer.length
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n
-    const t1 = [outer[i], outer[j], inner[i]]
-    const t2 = [outer[j], inner[j], inner[i]]
-    const t3 = [inner[i], inner[j], hub]
+    const t1: Pt[] = [outer[i], outer[j], inner[i]]
+    const t2: Pt[] = [outer[j], inner[j], inner[i]]
+    const t3: Pt[] = [inner[i], inner[j], hub]
     const s1 = facetShade(cx, cy, t1)
     const s2 = facetShade(cx, cy, t2)
     const s3 = facetShade(cx, cy, t3)
@@ -48,13 +58,13 @@ function bodyFacets(body, shape, color) {
     out.push({ p: pts(t2), f: shade(color, s2 > 0 ? s2 * 0.18 + 0.04 : s2 * 0.3) })
     out.push({ p: pts(t3), f: shade(color, s3 > 0 ? s3 * 0.22 + 0.12 : s3 * 0.15 + 0.06) })
   }
-  facetCache.set(key, out)
+  facetCache.set(body + color, out)
   return out
 }
 
-const eyeShape = (x, y) => [[x, y - 8], [x + 8, y - 3], [x + 8, y + 4], [x, y + 9], [x - 8, y + 4], [x - 8, y - 3]]
+const eyeShape = (x: number, y: number): Pt[] => [[x, y - 8], [x + 8, y - 3], [x + 8, y + 4], [x, y + 9], [x - 8, y + 4], [x - 8, y - 3]]
 
-function Eyes({ type, mood, y }) {
+function Eyes({ type, mood, y }: { type: EyeStyle; mood?: Mood; y: number }) {
   const L = 44
   const R = 76
   if (mood === 'happy') {
@@ -156,7 +166,7 @@ function Eyes({ type, mood, y }) {
   }
 }
 
-function Mouth({ type, mood, y }) {
+function Mouth({ type, mood, y }: { type: MouthStyle; mood?: Mood; y: number }) {
   const m = mood === 'happy' ? 'happy' : mood === 'horror' ? 'horror' : type
   switch (m) {
     case 'happy':
@@ -198,7 +208,7 @@ function Mouth({ type, mood, y }) {
   }
 }
 
-function Hat({ type, shape, c2 }) {
+function Hat({ type, shape, c2 }: { type: HatStyle; shape: Shape; c2: string }) {
   const y = shape.top
   const w = shape.topW
   const light = shade(c2, 0.3)
@@ -257,7 +267,17 @@ function Hat({ type, shape, c2 }) {
  * effect: undefined | power id (adds a visual effect)
  * animate: idle breathe / bounce
  */
-function AvatarImpl({ config, mood, effect, animate = true, size = 120, className = '', dim = false }) {
+export interface AvatarProps {
+  config: AvatarConfig | null | undefined
+  mood?: Mood
+  effect?: PowerId
+  animate?: boolean
+  size?: number
+  className?: string
+  dim?: boolean
+}
+
+function AvatarImpl({ config, mood, effect, animate = true, size = 120, className = '', dim = false }: AvatarProps) {
   if (!config) return null
   const shape = SHAPES[config.body] || SHAPES.square
   const facets = bodyFacets(config.body, shape, config.color1)
@@ -266,7 +286,7 @@ function AvatarImpl({ config, mood, effect, animate = true, size = 120, classNam
   const cx = shape.c[0]
   const bottom = shape.pts.reduce((m, p) => Math.max(m, p[1]), 0)
   const by = Math.min(bottom - 22, 118)
-  const belly = [[cx, by - 8], [cx + 8, by], [cx, by + 8], [cx - 8, by]]
+  const belly: Pt[] = [[cx, by - 8], [cx + 8, by], [cx, by + 8], [cx - 8, by]]
   const footColor = shade(c2, -0.35)
   return (
     <svg

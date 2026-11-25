@@ -1,5 +1,7 @@
+export type Rand = () => number
+
 // Small seeded PRNG (mulberry32). Same seed -> same sequence on every device.
-export function mulberry32(seed) {
+export function mulberry32(seed: number): Rand {
   let a = seed >>> 0
   return function () {
     a = (a + 0x6d2b79f5) >>> 0
@@ -10,7 +12,7 @@ export function mulberry32(seed) {
   }
 }
 
-export function shuffled(list, rand) {
+export function shuffled<T>(list: readonly T[], rand: Rand): T[] {
   const arr = list.slice()
   for (let i = arr.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1))
@@ -19,6 +21,6 @@ export function shuffled(list, rand) {
   return arr
 }
 
-export function randomSeed() {
+export function randomSeed(): number {
   return Math.floor(Math.random() * 2 ** 31)
 }

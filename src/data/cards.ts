@@ -2,7 +2,9 @@
 // so they can be read while falling. Items marked "debatable" are
 // intentionally ambiguous to spark discussion in class.
 
-export const RED_FLAGS = [
+import type { Power, PowerId } from '../lib/types'
+
+export const RED_FLAGS: string[] = [
   'Checks your phone without asking',
   'Says all their exes were crazy',
   'Gets jealous of your friends',
@@ -38,7 +40,7 @@ export const RED_FLAGS = [
   'Needs to know where you are',
 ]
 
-export const GREEN_FLAGS = [
+export const GREEN_FLAGS: string[] = [
   'Remembers your coffee order',
   'Says sorry and means it',
   'Listens without checking their phone',
@@ -73,7 +75,7 @@ export const GREEN_FLAGS = [
   'Tells you exactly what they think',
 ]
 
-export const POWERS = {
+export const POWERS: Record<PowerId, Power> = {
   gaslighting: {
     id: 'gaslighting',
     name: 'Gaslighting',
@@ -111,4 +113,4 @@ export const POWERS = {
   },
 }
 
-export const POWER_IDS = Object.keys(POWERS)
+export const POWER_IDS = Object.keys(POWERS) as PowerId[]
