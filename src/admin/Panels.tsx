@@ -1,6 +1,6 @@
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, NEXT_ROUND_MS, roundConfig, TOTAL_ROUNDS } from '../lib/game'
+import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, roundConfig, TOTAL_ROUNDS } from '../lib/game'
 import type { Award, PlayerInfo, PodiumStats, RoundSummary, SabotageEvent } from '../lib/types'
 import type { AdminGame, Announcement } from './useAdminGame'
 
@@ -169,7 +169,6 @@ export function Announcer({ items }: { items: Announcement[] }) {
 export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame; rows: RankRow[]; autoLeft: number; paused: boolean }) {
   const sum: RoundSummary | undefined = game.summary
   const cfg = roundConfig(game.round)
-  const discussing = autoLeft > NEXT_ROUND_MS
   const last = game.round >= TOTAL_ROUNDS
   return (
     <div className="round-end">
@@ -188,11 +187,9 @@ export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame
           </div>
         )}
         <div className="re-question">{sum?.question}</div>
-        <div className={`re-timer ${discussing ? '' : 'next'}`}>
+        <div className="re-timer next">
           {paused ? '⏸ ' : ''}
-          {discussing
-            ? `Discuss: ${formatClock(autoLeft - NEXT_ROUND_MS)}`
-            : `${last ? 'Awards' : `Round ${game.round + 1}`} in ${Math.ceil(autoLeft / 1000)}`}
+          {`${last ? 'Awards' : 'Next'} in ${Math.ceil(autoLeft / 1000)}`}
         </div>
       </div>
     </div>

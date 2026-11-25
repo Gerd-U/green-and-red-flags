@@ -54,7 +54,10 @@ export interface ScheduledCard {
   kind: CardKind
   /** field heights per ms */
   speed: number
+  /** short text printed on the card */
   text?: string
+  /** full sentence (shown when caught) */
+  full?: string
   power?: PowerId
   /** falls grey: color only revealed when caught or when it passes the player */
   grey?: boolean
@@ -174,6 +177,8 @@ export interface CatchMsg {
   streak: number
   /** this catch left the player heartbroken */
   broke?: boolean
+  /** the card was falling grey (color hidden) */
+  grey?: boolean
 }
 
 export interface MissMsg {

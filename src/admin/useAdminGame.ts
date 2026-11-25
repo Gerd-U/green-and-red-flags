@@ -11,9 +11,8 @@ import {
   DEFENSE_RESUME_MS,
   DEFENSE_TALK_MS,
   DEFENSE_VOTE_MS,
-  DISCUSSION_MS,
   MAX_STREAK_LEVEL,
-  NEXT_ROUND_MS,
+  ROUND_RESULTS_MS,
   RED_PENALTY,
   roundConfig,
   START_HEARTS,
@@ -63,6 +62,9 @@ export interface CatchFx {
   pid: string
   kind: CatchMsg['kind']
   at: number
+  cardId: number
+  /** full sentence of the caught card */
+  text?: string
 }
 
 export interface Announcement {
@@ -363,7 +365,7 @@ export function useAdminGame(code: string) {
     s.phase = 'roundEnd'
     s.summary = { round: s.round, topRed: topOf(s.roundRed), question: pick(DISCUSSION_QUESTIONS) }
     const last = s.round >= TOTAL_ROUNDS
-    setAuto(last ? 'Awards' : `Round ${s.round + 1}`, DISCUSSION_MS + NEXT_ROUND_MS, last ? 'awards' : 'nextRound')
+    setAuto(last ? 'Awards' : `Round ${s.round + 1}`, ROUND_RESULTS_MS, last ? 'awards' : 'nextRound')
     commit()
     persist(true)
   }
@@ -532,7 +534,7 @@ export function useAdminGame(code: string) {
   const handleCatch = (m: CatchMsg) => {
     const s = g.current
     if (m.round !== s.round) return
-    catchFx.current.push({ pid: m.id, kind: m.kind, at: performance.now() })
+    catchFx.current.push({ pid: m.id, kind: m.kind, at: performance.now(), cardId: m.cardId, text: m.text })
     if (catchFx.current.length > 60) catchFx.current.splice(0, 30)
     const name = s.players[m.id]?.name ?? 'Someone'
     const t = elapsed()

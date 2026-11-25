@@ -6,6 +6,7 @@ import {
   buildSchedule,
   CARD_H,
   CARD_W,
+  CATCH_REVEAL_MS,
   clamp,
   comboMult,
   DASH_COOLDOWN_MS,
@@ -17,7 +18,6 @@ import {
   MAX_STREAK_LEVEL,
   MISS_PENALTY,
   MOVE_SPEED,
-  PLAYER_H,
   PLAYER_W,
   PLAYER_Y,
   RED_PENALTY,
@@ -151,6 +151,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
     shakeUntil: 0,
     flash: '' as '' | 'green' | 'red' | 'gold',
     flashUntil: 0,
+    reveal: null as null | { text: string; kind: string; until: number; id: number },
   })
 
   const input = useRef({ left: false, right: false, gamma: 0, lastTap: { dir: 0, at: 0 }, swipe: null as null | { x: number; at: number } })
@@ -248,6 +249,24 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
 
   const [, setFrame] = useState(0)
 
+  // The avatar is drawn with a fixed width (PLAYER_W of the field width), so
+  // its height in field units depends on the phone's aspect ratio. We measure
+  // the field to know where the body really is (collision = what you see).
+  const fieldRef = useRef<HTMLDivElement>(null)
+  const aspect = useRef(0.6)
+  useEffect(() => {
+    const el = fieldRef.current
+    if (!el) return
+    const measure = () => {
+      const r = el.getBoundingClientRect()
+      if (r.height > 0) aspect.current = r.width / r.height
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   useEffect(() => {
     let raf = 0
     const loop = () => {
@@ -290,20 +309,29 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
       }
       const broken = s.hbUntil > 0
 
-      // dev bot: walk to greens, away from reds (and make mistakes sometimes)
+      const { bodyTop, bodyBottom } = bodyBox(aspect.current)
+
+      // dev bot: pick the x that catches greens and avoids reds in the next
+      // rows (and make a mistake on ~1 card out of 5)
       if (bot) {
-        const target = s.active
-          .filter((a) => a.y < PLAYER_Y && a.y > 0.25)
-          .sort((a, b) => b.y - a.y)[0]
-        let want = s.x
-        if (target) {
-          const good = target.card.kind !== 'red' && target.card.kind !== 'ick'
-          const dumb = (target.card.id * 7 + round) % 5 === 0
-          if (good !== dumb) want = target.card.x
-          else if (Math.abs(target.card.x - s.x) < HIT_DX + 0.08) want = target.card.x > 0.5 ? 0.15 : 0.85
+        const near = s.active.filter((a) => a.y < bodyBottom && a.y > 0.15)
+        let best = s.x
+        let bestV = -Infinity
+        for (let x = PLAYER_W / 2; x <= 1 - PLAYER_W / 2; x += 0.03) {
+          let v = -Math.abs(x - s.x) * 0.6
+          for (const a of near) {
+            if (Math.abs(a.card.x - x) >= HIT_DX + 0.02) continue
+            const good = a.card.kind !== 'red' && a.card.kind !== 'ick'
+            const dumb = (a.card.id * 7 + round) % 5 === 0
+            v += (good !== dumb ? 1 : -1.6) * (0.4 + a.y)
+          }
+          if (v > bestV) {
+            bestV = v
+            best = x
+          }
         }
-        input.current.left = want < s.x - 0.03
-        input.current.right = want > s.x + 0.03
+        input.current.left = best < s.x - 0.02
+        input.current.right = best > s.x + 0.02
       }
 
       // movement
@@ -344,9 +372,9 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
         a.y += dt * a.card.speed * mult
         const bottom = a.y + CARD_H / 2
         const top = a.y - CARD_H / 2
-        if (!a.revealed && a.y >= PLAYER_Y - PLAYER_H / 2) a.revealed = true
+        if (!a.revealed && bottom >= bodyTop) a.revealed = true
         const hit =
-          playing && !broken && bottom >= PLAYER_Y - PLAYER_H / 2 && top <= PLAYER_Y && Math.abs(a.card.x - s.x) < HIT_DX
+          playing && !broken && bottom >= bodyTop && top <= bodyBottom && Math.abs(a.card.x - s.x) < HIT_DX
         if (hit) {
           const c = a.card
           const pop: Popup = { id: s.uid++, x: c.x, text: '', cls: '', at: realNow }
@@ -415,14 +443,15 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
           s.flashUntil = realNow + 260
           s.popups.push(pop)
           s.bursts.push(burst)
-          p.onCatch({ id: me, round, kind: c.kind, cardId: c.id, text: c.text, power: c.power, streak: s.streak, broke })
+          if (c.full) s.reveal = { text: c.full, kind: c.kind, until: realNow + CATCH_REVEAL_MS, id: c.id }
+          p.onCatch({ id: me, round, kind: c.kind, cardId: c.id, text: c.full ?? c.text, power: c.power, streak: s.streak, broke, grey: c.grey })
           continue
         }
         if (top > 1.02) {
           if (a.card.kind === 'green' && a.card.text && clock.current.running && !broken) {
             s.score -= MISS_PENALTY * pm
             s.popups.push({ id: s.uid++, x: a.card.x, text: fmtPts(-MISS_PENALTY * pm), cls: 'pop-miss', at: realNow })
-            p.onMiss({ id: me, round, text: a.card.text })
+            p.onMiss({ id: me, round, text: a.card.full ?? a.card.text })
             fb({ type: 'miss' })
           }
           continue
@@ -533,6 +562,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
       </div>
 
       <div
+        ref={fieldRef}
         className={`field ${s.flashUntil > realNow ? `flash-${s.flash}` : ''}`}
         onPointerDown={swipeStart}
         onPointerUp={swipeEnd}
@@ -562,7 +592,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
                 </>
               ) : (
                 <>
-                  <span className="fcard-tag">{TAG[look] ?? ''}</span>
+                  {ICON[look] && <span className="fcard-icon">{ICON[look]}</span>}
                   <span className="fcard-text">{c.text}</span>
                 </>
               )}
@@ -570,7 +600,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
           )
         })}
 
-        <div className="player-line" style={{ top: `${(PLAYER_Y - PLAYER_H / 2) * 100}%` }} />
+        <div className="player-line" style={{ top: `${bodyBox(aspect.current).bodyTop * 100}%` }} />
 
         {s.bursts.map((b) => (
           <div key={b.id} className={`burst burst-${b.kind}`} style={{ left: `${b.x * 100}%`, top: `${PLAYER_Y * 100 - 4}%` }}>
@@ -598,6 +628,12 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
           </div>
         )}
         {s.shield && !s.effects.length && <div className="shield-badge">🛡️ Therapy shield ON</div>}
+
+        {s.reveal && s.reveal.until > realNow && (
+          <div className={`catch-reveal cr-${s.reveal.kind}`} key={s.reveal.id}>
+            {s.reveal.text}
+          </div>
+        )}
 
         {countdown > 0 && (
           <div className="countdown" key={countdown}>
@@ -646,14 +682,22 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
   )
 }
 
+/**
+ * Where the drawn body is, in field units. The avatar box is PLAYER_W wide,
+ * 174/132 as tall as wide (Avatar viewBox), and is placed with
+ * translate(-50%, -62%) at PLAYER_Y. The hair starts ~7% below the box top
+ * and the shoe soles end ~5% above its bottom.
+ */
+function bodyBox(aspect: number) {
+  const h = PLAYER_W * (174 / 132) * aspect
+  return { bodyTop: PLAYER_Y - 0.62 * h + 0.07 * h, bodyBottom: PLAYER_Y + 0.38 * h - 0.05 * h }
+}
+
 const KIND_CODE = { green: 'g', red: 'r', power: 'p', ick: 'i', soulmate: 's' } as const
 
-const TAG: Record<string, string> = {
-  green: 'GREEN',
-  red: 'RED',
-  grey: '???',
-  ick: 'ICK',
-  soulmate: '★ SOULMATE',
+const ICON: Record<string, string> = {
+  ick: '🤢',
+  soulmate: '★',
 }
 
 const BURST_CHAR: Record<Burst['kind'], string> = {

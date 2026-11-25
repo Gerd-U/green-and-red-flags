@@ -62,7 +62,7 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
         const stale = !buf || now - buf.curAt > 2500
         const hearts = tick ? tick.hearts : START_HEARTS
         const streak = tick?.streak ?? 0
-        const recent = catchFx.current.filter((c) => c.pid === p.id && now - c.at < 900)
+        const recent = catchFx.current.filter((c) => c.pid === p.id && now - c.at < 1000)
         const shaking = recent.some((c) => c.kind === 'red' && now - c.at < 350)
         return (
           <div
@@ -120,6 +120,14 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
                   ))}
                 </div>
               ))}
+              {(() => {
+                const r = [...recent].reverse().find((c) => c.text && now - c.at < 1000)
+                return r ? (
+                  <div className={`mini-reveal cr-${r.kind}`} key={`${r.at}`}>
+                    {r.text}
+                  </div>
+                ) : null
+              })()}
               {fx && (
                 <div className="mini-fx-label" style={{ background: POWERS[fx].color }}>
                   {POWERS[fx].emoji} {POWERS[fx].name}
