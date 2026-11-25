@@ -170,6 +170,8 @@ export interface GameState {
   roundScores: Record<string, number>
   /** last hearts each phone reported (used to recover after a reload) */
   hearts: Record<string, number>
+  /** players who started the current round (late joiners wait for the next one) */
+  roundIds: string[]
   defense: Defense | null
   hotTake: HotTake | null
   auto: AutoAdvance | null

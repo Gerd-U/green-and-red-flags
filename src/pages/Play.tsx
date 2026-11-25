@@ -383,7 +383,10 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
 
   const others = players.filter((p) => p.id !== me)
   const phase = state?.phase
-  const inRound = state && (phase === 'playing' || phase === 'defense' || phase === 'roundEnd') && state.round > 0
+  const roundPhase = phase === 'playing' || phase === 'defense' || phase === 'roundEnd'
+  // joined after the round started: wait for the next one
+  const waitingNext = Boolean(state && roundPhase && state.round > 0 && !(state.roundIds ?? []).includes(me))
+  const inRound = state && roundPhase && state.round > 0 && !waitingNext
   const defense = state?.defense ?? null
   const autoLeft = useCountdown(state?.auto?.remaining, state?.seq, state?.auto?.paused)
   const stageLeft = useCountdown(defense?.remaining, state?.seq)
@@ -506,7 +509,9 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
                   ? 'Connecting...'
                   : !adminOnline
                     ? 'Waiting for the host to open the room...'
-                    : "You're in! Look for your dating profile on the big screen."}
+                    : waitingNext
+                      ? '⏳ Joining next round… watch the big screen!'
+                      : "You're in! Look for your dating profile on the big screen."}
               </p>
               <div className="wait-actions">
                 <button className="btn btn-ghost" onClick={onEdit}>

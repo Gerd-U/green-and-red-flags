@@ -317,6 +317,7 @@ export function useAdminGame(code: string) {
       roundScores: s.roundScores,
       hearts: s.hearts,
       seq: s.seq,
+      roundIds: s.roundIds,
       summary: s.summary,
       awards: s.awards,
       stats: s.stats,
@@ -557,6 +558,19 @@ export function useAdminGame(code: string) {
     commit()
   }
 
+  /** The defender left (closed the page / lost connection): skip the defense, the game goes on. */
+  const cancelDefense = () => {
+    const s = g.current
+    if (!s.defense) return
+    const name = s.defense.name
+    s.defense = null
+    s.auto = null
+    s.phase = 'playing'
+    if (elapsed() < roundConfig(s.round).durationMs) resume()
+    announce('DEFENSE CANCELLED', '#94a3b8', `${name} left the game`)
+    commit()
+  }
+
   const finishDefense = () => {
     const s = g.current
     if (!s.defense) return
@@ -727,7 +741,7 @@ export function useAdminGame(code: string) {
   // --- incoming messages from phones ---
   const handleTick = (t: Tick) => {
     const s = g.current
-    if (t.round !== s.round) return
+    if (t.round !== s.round || !s.roundIds.includes(t.id)) return
     const now = performance.now()
     const buf = ticks.current[t.id] ?? { prev: null, prevAt: 0, cur: null, curAt: 0 }
     buf.prev = buf.cur
@@ -739,7 +753,6 @@ export function useAdminGame(code: string) {
       s.roundScores[t.id] = t.score
       s.hearts[t.id] = t.hearts
       if (s.totals[t.id] == null) s.totals[t.id] = 0
-      if (!s.roundIds.includes(t.id)) s.roundIds.push(t.id)
     }
   }
 
@@ -974,8 +987,9 @@ export function useAdminGame(code: string) {
   }, [code])
 
   // --- game loop (timers, heartbeat) ---
-  const loopFns = useRef({ startRound, startVote, resolveVote, endRound, runAuto, htReveal })
-  loopFns.current = { startRound, startVote, resolveVote, endRound, runAuto, htReveal }
+  const loopFns = useRef({ startRound, startVote, resolveVote, endRound, runAuto, htReveal, cancelDefense })
+  loopFns.current = { startRound, startVote, resolveVote, endRound, runAuto, htReveal, cancelDefense }
+  const defenderMissingSince = useRef(0)
   useEffect(() => {
     const id = setInterval(() => {
       const s = g.current
@@ -991,6 +1005,15 @@ export function useAdminGame(code: string) {
           s.last10Round = s.round
           announce('LAST 10 SECONDS!', '#ffd23f', undefined, 'last10')
         }
+      }
+      if (s.phase === 'defense' && s.defense && s.defense.stage !== 'result') {
+        if (s.players[s.defense.playerId]?.online === false) {
+          defenderMissingSince.current ||= now
+          if (now - defenderMissingSince.current > 4000) {
+            defenderMissingSince.current = 0
+            return fns.cancelDefense()
+          }
+        } else defenderMissingSince.current = 0
       }
       if (s.phase === 'defense' && s.defense?.stage === 'talk' && now >= s.defense.stageEndsAt) return fns.startVote()
       if (s.phase === 'defense' && s.defense?.stage === 'vote' && now >= s.defense.stageEndsAt) return fns.resolveVote()
