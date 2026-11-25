@@ -301,6 +301,7 @@ export interface HostPlayer {
   id: string
   name: string
   avatar: AvatarConfig
+  bio: string
   online: boolean
   ready: boolean
 }

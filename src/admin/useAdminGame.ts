@@ -376,7 +376,7 @@ export function useAdminGame(code: string) {
       const info: HostInfo = {
         state,
         activityMs: Date.now() - s.createdAt,
-        players: Object.values(s.players).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, online: p.online, ready: p.ready })),
+        players: Object.values(s.players).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, bio: p.bio, online: p.online, ready: p.ready })),
         script: {
           roundRed: toList(s.roundRed),
           roundMiss: toList(s.roundMiss),

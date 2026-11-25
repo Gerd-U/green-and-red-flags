@@ -2766,3 +2766,71 @@ html.host-page .screen {
   place-items: center;
   white-space: nowrap;
 }
+
+/* ---------- host teleprompter ---------- */
+.host-script {
+  background: #f8f4ea;
+  color: #1b1030;
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 10px 30px #000a;
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+}
+.hs-title {
+  font-size: 14px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #8c1230;
+}
+.hs-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #6b5b86;
+  margin-bottom: 2px;
+}
+.hs-say p {
+  margin: 0 0 6px;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.hs-facts p {
+  margin: 0 0 6px;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.hs-ask {
+  border-top: 2px dashed #1b103033;
+  padding-top: 8px;
+}
+.hs-ask.real .hs-label {
+  color: #16a34a;
+}
+.hs-count {
+  color: #6b5b86;
+}
+.hs-question {
+  margin: 0 0 8px;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.hs-nav {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 6px;
+}
+.hs-nav .btn {
+  --c: #1b10301a;
+  color: #1b1030;
+  font-size: 18px;
+  padding: 10px 6px;
+}

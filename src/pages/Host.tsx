@@ -294,8 +294,10 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
   const d = s.defense
   const h = s.hotTake
 
-  const Btn = ({ cmd, arg, children, kind = 'ghost', wide = false }: { cmd: HostCmdName; arg?: string; children: ReactNode; kind?: 'green' | 'red' | 'ghost' | 'gold'; wide?: boolean }) => (
-    <button className={`btn btn-${kind} host-btn ${wide ? 'wide' : ''}`} onClick={() => send(cmd, arg)}>
+  // plain render helper (not a component), so the buttons keep the same DOM
+  // node between the 2 refreshes per second and a tap is never lost
+  const btn = (cmd: HostCmdName, children: ReactNode, kind: 'green' | 'red' | 'ghost' | 'gold' = 'ghost', wide = false) => (
+    <button key={cmd} className={`btn btn-${kind} host-btn ${wide ? 'wide' : ''}`} onClick={() => send(cmd)}>
       {children}
     </button>
   )
@@ -330,32 +332,24 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
         {/* ---------- controls per phase ---------- */}
         <section className="host-controls">
           {s.phase === 'intro' && (
-            <Btn cmd="openLobby" kind="green" wide>
-              Open the lobby ▶
-            </Btn>
+            <>{btn('openLobby', <>Open the lobby ▶</>, 'green', true)}</>
           )}
           {s.phase === 'lobby' && (
             <>
               <div className="host-status">
                 {ready} of {playersOnline.length} ready
               </div>
-              <Btn cmd="start" kind="green" wide>
-                Start game ▶
-              </Btn>
+              <>{btn('start', <>Start game ▶</>, 'green', true)}</>
             </>
           )}
           {s.phase === 'tutorial' && (
-            <Btn cmd="skip" kind="green" wide>
-              Skip tutorial ⏭
-            </Btn>
+            <>{btn('skip', <>Skip tutorial ⏭</>, 'green', true)}</>
           )}
           {s.phase === 'playing' && (
             <>
               <div className="host-status">{s.running ? `${roundConfig(s.round).name}: playing` : 'Paused'}</div>
-              <Btn cmd="pause" kind={s.running ? 'ghost' : 'green'}>
-                {s.running ? '⏸ Pause' : '▶ Resume'}
-              </Btn>
-              <Btn cmd="endRound">End round</Btn>
+              <>{btn('pause', <>{s.running ? '⏸ Pause' : '▶ Resume'}</>, s.running ? 'ghost' : 'green')}</>
+              <>{btn('endRound', <>End round</>, 'ghost')}</>
             </>
           )}
           {s.phase === 'defense' && d && (
@@ -369,25 +363,17 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
               </div>
               {d.stage === 'talk' && (
                 <>
-                  <Btn cmd="objection" kind="gold" wide>
-                    ⚖️ OBJECTION! (+10 s)
-                  </Btn>
-                  <Btn cmd="vote" kind="green" wide>
-                    Go to the vote ⏭
-                  </Btn>
+                  <>{btn('objection', <>⚖️ OBJECTION! (+10 s)</>, 'gold', true)}</>
+                  <>{btn('vote', <>Go to the vote ⏭</>, 'green', true)}</>
                 </>
               )}
               {d.stage === 'vote' && (
-                <Btn cmd="skip" kind="green" wide>
-                  Close the vote ⏭
-                </Btn>
+                <>{btn('skip', <>Close the vote ⏭</>, 'green', true)}</>
               )}
               {d.stage === 'result' && (
                 <>
-                  <Btn cmd="pause">{s.auto?.paused ? '▶ Resume timer' : '⏸ Hold'}</Btn>
-                  <Btn cmd="skip" kind="green">
-                    Continue ▶
-                  </Btn>
+                  <>{btn('pause', <>{s.auto?.paused ? '▶ Resume timer' : '⏸ Hold'}</>, 'ghost')}</>
+                  <>{btn('skip', <>Continue ▶</>, 'green')}</>
                 </>
               )}
             </>
@@ -397,10 +383,8 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
               <div className="host-status">
                 {s.auto ? `${s.auto.label} in ${left(s.auto.remaining)}s${s.auto.paused ? ' (held)' : ''}` : 'Results'}
               </div>
-              <Btn cmd="pause">{s.auto?.paused ? '▶ Resume timer' : '⏸ Hold'}</Btn>
-              <Btn cmd="skip" kind="green">
-                {s.auto?.label ?? 'Next'} now ▶
-              </Btn>
+              <>{btn('pause', <>{s.auto?.paused ? '▶ Resume timer' : '⏸ Hold'}</>, 'ghost')}</>
+              <>{btn('skip', <>{s.auto?.label ?? 'Next'} now ▶</>, 'green')}</>
             </>
           )}
           {s.phase === 'hotTake' && h && (
@@ -414,12 +398,8 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
               </div>
               {h.stage === 'vote' ? (
                 <>
-                  <Btn cmd="htReveal" kind="green" wide>
-                    Reveal now
-                  </Btn>
-                  <Btn cmd="htNext" wide>
-                    Skip Hot Take (we are late) ⏭
-                  </Btn>
+                  <>{btn('htReveal', <>Reveal now</>, 'green', true)}</>
+                  <>{btn('htNext', <>Skip Hot Take (we are late) ⏭</>, 'ghost', true)}</>
                 </>
               ) : (
                 <>
@@ -441,29 +421,21 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
                     ))}
                   </div>
                   <div className="muted small center-text">Tap a name to give them the word (30 s)</div>
-                  <Btn cmd="htVerdict" kind="gold" wide>
-                    👑 Host&apos;s verdict
-                  </Btn>
-                  <Btn cmd="htNext" kind="green" wide>
-                    Next round ▶
-                  </Btn>
+                  <>{btn('htVerdict', <>👑 Host&apos;s verdict</>, 'gold', true)}</>
+                  <>{btn('htNext', <>Next round ▶</>, 'green', true)}</>
                 </>
               )}
             </>
           )}
           {s.phase === 'awards' && (
-            <Btn cmd="podium" kind="green" wide>
-              Podium now ▶
-            </Btn>
+            <>{btn('podium', <>Podium now ▶</>, 'green', true)}</>
           )}
           {s.phase === 'podium' && (
-            <Btn cmd="final" kind="green" wide>
-              Final thoughts ▶
-            </Btn>
+            <>{btn('final', <>Final thoughts ▶</>, 'green', true)}</>
           )}
-          {(s.phase === 'podium' || s.phase === 'final') && <Btn cmd="playAgain">Play again</Btn>}
+          {(s.phase === 'podium' || s.phase === 'final') && <>{btn('playAgain', <>Play again</>, 'ghost')}</>}
           {(s.phase === 'roundEnd' || s.phase === 'hotTake') && s.round >= TOTAL_ROUNDS && (
-            <Btn cmd="awards">Go to awards</Btn>
+            <>{btn('awards', <>Go to awards</>, 'ghost')}</>
           )}
         </section>
 

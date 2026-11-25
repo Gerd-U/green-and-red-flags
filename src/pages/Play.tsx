@@ -417,7 +417,8 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
       setVotedKey(key)
     }, 500 + Math.random() * 3000)
     return () => clearTimeout(t)
-  }, [bot, defense, me, votedKey])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bot, defense?.key, defense?.stage, me, votedKey])
 
   const voteHotTake = (v: 'red' | 'green') => {
     if (!hot) return
@@ -436,7 +437,9 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
       setHtVote({ key, vote: v })
     }, 800 + Math.random() * 4000)
     return () => clearTimeout(t)
-  }, [bot, hot, htVote, me])
+    // only restart the timer when a new Hot Take vote starts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bot, hot?.key, hot?.stage, htVote?.key, me])
 
   const vote = (v: 'convinced' | 'not') => {
     if (!defense) return
