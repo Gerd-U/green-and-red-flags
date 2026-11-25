@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Home from './pages/Home'
 import Admin from './pages/Admin'
 import Play from './pages/Play'
+import Host from './pages/Host'
 import { supabaseConfigured } from './lib/supabase'
 import PolyBackground from './components/PolyBackground'
 
@@ -31,6 +32,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/admin" element={<Admin />} />
       <Route path="/play" element={<Play />} />
+      <Route path="/host" element={<Host />} />
       {DevBots && (
         <Route
           path="/dev/bots"

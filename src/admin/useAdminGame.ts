@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { DISCUSSION_QUESTIONS } from '../data/cards'
+import { DISCUSSION_QUESTIONS, HOT_TAKES } from '../data/cards'
 import { sanitizeProfileLine } from '../data/profiles'
 import { sanitizeAvatar } from '../lib/avatar'
 import {
@@ -11,24 +11,43 @@ import {
   DEFENSE_RESUME_MS,
   DEFENSE_TALK_MS,
   DEFENSE_VOTE_MS,
+  HOTTAKE_AFTER_ROUNDS,
+  HOTTAKE_SPEAKER_MS,
+  HOTTAKE_VOTE_MS,
   MAX_STREAK_LEVEL,
-  ROUND_RESULTS_MS,
+  OBJECTION_MS,
   RED_PENALTY,
+  ROUND_RESULTS_MS,
   roundConfig,
   START_HEARTS,
   TOTAL_ROUNDS,
   TUTORIAL_MS,
 } from '../lib/game'
+import {
+  ENV_HOST_PASSWORD,
+  hostTopic,
+  loginProof,
+  makePin,
+  randomHex,
+  xorToken,
+  type HostAuthMsg,
+  type HostCmd,
+  type HostLoginMsg,
+} from '../lib/host'
 import { randomSeed } from '../lib/rng'
-import type { Sfx } from '../lib/sfx'
 import { mainTopic, openChannel, playerTopic, type Room } from '../lib/room'
+import type { Sfx } from '../lib/sfx'
 import { load, save } from '../lib/storage'
 import type {
   Award,
   CatchMsg,
   Defense,
+  FinalStats,
   GameState,
   GrantEvent,
+  HostInfo,
+  HotTake,
+  HotTakeVoteMsg,
   MissMsg,
   Phase,
   PlayerInfo,
@@ -37,6 +56,7 @@ import type {
   PresenceMeta,
   RoundSummary,
   SabotageEvent,
+  ScriptData,
   Tick,
   VoteMsg,
 } from '../lib/types'
@@ -80,7 +100,12 @@ interface AdminDefense extends Defense {
   votes: Record<string, 'convinced' | 'not'>
 }
 
-type AutoAction = 'resume' | 'nextRound' | 'awards' | 'podium'
+interface AdminHotTake extends HotTake {
+  stageEndsAt: number
+  votes: Record<string, 'red' | 'green'>
+}
+
+type AutoAction = 'resume' | 'nextRound' | 'hotTake' | 'awards' | 'podium'
 interface AdminAuto {
   label: string
   endsAt: number
@@ -104,22 +129,34 @@ export interface AdminGame {
   hearts: Record<string, number>
   defense: AdminDefense | null
   defenseDone: boolean
+  hotTake: AdminHotTake | null
+  hotTakesUsed: string[]
+  hotTakesDone: ScriptData['hotTakes']
   auto: AdminAuto | null
   tutorialEndsAt: number
   last10Round: number
   summary?: RoundSummary
   awards?: Award[]
   stats?: PodiumStats
+  finalStats?: FinalStats
   players: Record<string, PlayerInfo>
   counters: { reds: Counter; sent: Counter; received: Counter; icks: Counter; lawyer: Counter }
   redStats: Record<string, string[]>
   missStats: Record<string, string[]>
   roundRed: Record<string, string[]>
+  roundMiss: Record<string, string[]>
+  greyReds: { id: string; text: string }[]
+  sabotagePairs: Record<string, Record<string, number>>
+  roundIds: string[]
   createdAt: number
+  /** 4-digit PIN when VITE_HOST_PASSWORD is not set */
+  hostPin: string
+  /** tokens of logged-in hosts (kept on reload) */
+  hostTokens: string[]
   seq: number
 }
 
-type Snapshot = Omit<AdminGame, 'defense' | 'clockAt' | 'running' | 'seq' | 'auto' | 'tutorialEndsAt'> & {
+type Snapshot = Omit<AdminGame, 'defense' | 'hotTake' | 'clockAt' | 'running' | 'seq' | 'auto' | 'tutorialEndsAt'> & {
   code: string
   savedAt: number
 }
@@ -130,9 +167,9 @@ function emptyCounters(): AdminGame['counters'] {
   return { reds: {}, sent: {}, received: {}, icks: {}, lawyer: {} }
 }
 
-function freshGame(createdAt = Date.now()): AdminGame {
+function freshGame(keep?: Pick<AdminGame, 'createdAt' | 'players' | 'hostPin' | 'hostTokens'>): AdminGame {
   return {
-    phase: 'lobby',
+    phase: 'intro',
     round: 0,
     seed: 1,
     gameSeed: 1,
@@ -144,15 +181,24 @@ function freshGame(createdAt = Date.now()): AdminGame {
     hearts: {},
     defense: null,
     defenseDone: false,
+    hotTake: null,
+    hotTakesUsed: [],
+    hotTakesDone: [],
     auto: null,
     tutorialEndsAt: 0,
     last10Round: 0,
-    players: {},
+    players: keep?.players ?? {},
     counters: emptyCounters(),
     redStats: {},
     missStats: {},
     roundRed: {},
-    createdAt,
+    roundMiss: {},
+    greyReds: [],
+    sabotagePairs: {},
+    roundIds: [],
+    createdAt: keep?.createdAt ?? Date.now(),
+    hostPin: keep?.hostPin ?? makePin(),
+    hostTokens: keep?.hostTokens ?? [],
     seq: 0,
   }
 }
@@ -169,14 +215,16 @@ export function clearAdminSnapshot() {
 
 function gameFromSnapshot(s: Snapshot | null): AdminGame {
   const g = freshGame()
-  if (!s || typeof s.gameSeed !== 'number') return g
+  if (!s || typeof s.gameSeed !== 'number' || typeof s.hostPin !== 'string') return g
   Object.assign(g, s)
-  // a reload during a defense/tutorial comes back paused in a safe phase
+  // a reload during a defense/tutorial/hot take comes back paused in a safe phase
   if (s.phase === 'defense') g.phase = 'playing'
   if (s.phase === 'tutorial') g.phase = 'lobby'
+  if (s.phase === 'hotTake') g.phase = 'roundEnd'
   g.counters = { ...emptyCounters(), ...(s.counters ?? {}) }
   g.running = false
   g.defense = null
+  g.hotTake = null
   g.auto = null
   for (const p of Object.values(g.players)) {
     p.online = false
@@ -196,6 +244,11 @@ function topOf(map: Record<string, string[]>) {
 
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
 const inc = (c: Counter, id: string, n = 1) => (c[id] = (c[id] ?? 0) + n)
+const addId = (map: Record<string, string[]>, text: string, id: string) => {
+  const list = (map[text] ??= [])
+  if (!list.includes(id)) list.push(id)
+}
+const toList = (map: Record<string, string[]>) => Object.entries(map).map(([text, ids]) => ({ text, ids }))
 
 export function useAdminGame(code: string) {
   const [initial] = useState(() => {
@@ -207,14 +260,20 @@ export function useAdminGame(code: string) {
   const catchFx = useRef<CatchFx[]>([])
   const main = useRef<Room | null>(null)
   const playerRooms = useRef<Record<string, Room>>({})
+  const hostRooms = useRef<Record<string, Room>>({})
   const [version, setVersion] = useState(0)
   const [status, setStatus] = useState('connecting')
   const [sabotages, setSabotages] = useState<SabotageEvent[]>([])
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
+  const [objectionKey, setObjectionKey] = useState(0)
+  const [hostOnline, setHostOnline] = useState(false)
   const lastBroadcast = useRef(0)
+  const lastHostInfo = useRef(0)
+  const lastHostSeen = useRef(0)
   const lastSave = useRef(0)
   const lastToxic = useRef(0)
   const annKey = useRef(0)
+  const loginAttempts = useRef<number[]>([])
 
   const bump = useCallback(() => setVersion((v) => v + 1), [])
 
@@ -233,7 +292,8 @@ export function useAdminGame(code: string) {
       if (!force && now - lastSave.current < 1500) return
       lastSave.current = now
       const s = g.current
-      const { defense: _d, clockAt: _c, running: _r, seq: _s, auto: _a, tutorialEndsAt: _t, ...rest } = s
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { defense: _d, hotTake: _h, clockAt: _c, running: _r, seq: _s, auto: _a, tutorialEndsAt: _t, ...rest } = s
       const snap: Snapshot = {
         ...rest,
         code,
@@ -245,12 +305,12 @@ export function useAdminGame(code: string) {
     [code, elapsed]
   )
 
-  const broadcast = useCallback(() => {
+  const buildState = useCallback((): GameState => {
     const s = g.current
-    s.seq++
     const d = s.defense
+    const h = s.hotTake
     const now = performance.now()
-    const state: GameState = {
+    return {
       phase: s.phase,
       round: s.round,
       seed: s.seed,
@@ -264,6 +324,7 @@ export function useAdminGame(code: string) {
       summary: s.summary,
       awards: s.awards,
       stats: s.stats,
+      finalStats: s.finalStats,
       tutorialLeft: s.phase === 'tutorial' ? Math.max(0, s.tutorialEndsAt - now) : undefined,
       auto: s.auto
         ? { label: s.auto.label, paused: s.auto.paused, remaining: s.auto.paused ? s.auto.pausedLeft : Math.max(0, s.auto.endsAt - now) }
@@ -282,13 +343,64 @@ export function useAdminGame(code: string) {
             convinced: d.convinced,
             notConvinced: d.notConvinced,
             result: d.result,
+            objections: d.objections,
+          }
+        : null,
+      hotTake: h
+        ? {
+            key: h.key,
+            text: h.text,
+            stage: h.stage,
+            remaining: Math.max(0, h.stageEndsAt - now),
+            votesIn: Object.keys(h.votes).length,
+            votesNeeded: h.votesNeeded,
+            red: h.red,
+            green: h.green,
+            pctRed: h.pctRed,
+            speaker: h.speaker,
           }
         : null,
     }
+  }, [elapsed])
+
+  const sendHostInfo = useCallback(
+    (state: GameState, force = false) => {
+      const rooms = Object.values(hostRooms.current)
+      if (!rooms.length) return
+      const now = performance.now()
+      if (!force && now - lastHostInfo.current < 300) return
+      lastHostInfo.current = now
+      const s = g.current
+      const pairs: ScriptData['sabotages'] = []
+      for (const [from, tos] of Object.entries(s.sabotagePairs)) for (const [to, n] of Object.entries(tos)) pairs.push({ from, to, n })
+      const info: HostInfo = {
+        state,
+        activityMs: Date.now() - s.createdAt,
+        players: Object.values(s.players).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, online: p.online, ready: p.ready })),
+        script: {
+          roundRed: toList(s.roundRed),
+          roundMiss: toList(s.roundMiss),
+          greyReds: s.greyReds,
+          sabotages: pairs,
+          hotTakes: s.hotTakesDone,
+          activeIds: s.roundIds,
+          reds: s.counters.reds,
+        },
+      }
+      for (const r of rooms) r.send('hostinfo', info)
+    },
+    []
+  )
+
+  const broadcast = useCallback(() => {
+    const s = g.current
+    s.seq++
+    const state = buildState()
     main.current?.send('state', state)
-    lastBroadcast.current = now
+    lastBroadcast.current = performance.now()
+    sendHostInfo(state)
     persist()
-  }, [elapsed, persist])
+  }, [buildState, persist, sendHostInfo])
 
   const commit = useCallback(() => {
     bump()
@@ -319,6 +431,13 @@ export function useAdminGame(code: string) {
   }
 
   // --- flow ---
+  const openLobby = () => {
+    const s = g.current
+    if (s.phase !== 'intro') return
+    s.phase = 'lobby'
+    commit()
+  }
+
   const startRound = () => {
     const s = g.current
     if (s.round >= TOTAL_ROUNDS) return
@@ -327,10 +446,14 @@ export function useAdminGame(code: string) {
     s.seed = randomSeed()
     s.defenseDone = false
     s.defense = null
+    s.hotTake = null
     s.auto = null
     s.summary = undefined
     s.roundRed = {}
+    s.roundMiss = {}
+    s.greyReds = []
     s.phase = 'playing'
+    s.roundIds = onlinePlayers().map((p) => p.id)
     for (const p of onlinePlayers()) {
       if (s.hearts[p.id] == null) s.hearts[p.id] = START_HEARTS
       if (s.totals[p.id] == null) s.totals[p.id] = 0
@@ -345,10 +468,8 @@ export function useAdminGame(code: string) {
 
   const startGame = () => {
     const s = g.current
-    const keepPlayers = s.players
-    const createdAt = s.createdAt
-    g.current = freshGame(createdAt)
-    g.current.players = keepPlayers
+    if (s.phase !== 'lobby' && s.phase !== 'intro') return
+    g.current = freshGame(s)
     g.current.gameSeed = randomSeed()
     g.current.phase = 'tutorial'
     g.current.tutorialEndsAt = performance.now() + TUTORIAL_MS
@@ -365,11 +486,14 @@ export function useAdminGame(code: string) {
     s.phase = 'roundEnd'
     s.summary = { round: s.round, topRed: topOf(s.roundRed), question: pick(DISCUSSION_QUESTIONS) }
     const last = s.round >= TOTAL_ROUNDS
-    setAuto(last ? 'Awards' : `Round ${s.round + 1}`, ROUND_RESULTS_MS, last ? 'awards' : 'nextRound')
+    if (last) setAuto('Awards', ROUND_RESULTS_MS, 'awards')
+    else if (HOTTAKE_AFTER_ROUNDS.includes(s.round)) setAuto('Hot Take', ROUND_RESULTS_MS, 'hotTake')
+    else setAuto(`Round ${s.round + 1}`, ROUND_RESULTS_MS, 'nextRound')
     commit()
     persist(true)
   }
 
+  // --- defense ---
   const startDefense = (playerId: string, text: string) => {
     const s = g.current
     freeze()
@@ -386,6 +510,7 @@ export function useAdminGame(code: string) {
       votes: {},
       votesIn: 0,
       votesNeeded: 0,
+      objections: 0,
     }
     commit()
   }
@@ -427,6 +552,15 @@ export function useAdminGame(code: string) {
     commit()
   }
 
+  const objection = () => {
+    const d = g.current.defense
+    if (!d || d.stage !== 'talk') return
+    d.stageEndsAt += OBJECTION_MS
+    d.objections = (d.objections ?? 0) + 1
+    setObjectionKey((k) => k + 1)
+    commit()
+  }
+
   const finishDefense = () => {
     const s = g.current
     if (!s.defense) return
@@ -437,11 +571,71 @@ export function useAdminGame(code: string) {
     commit()
   }
 
+  // --- hot take ---
+  const startHotTake = () => {
+    const s = g.current
+    const unused = HOT_TAKES.filter((t) => !s.hotTakesUsed.includes(t))
+    const text = pick(unused.length ? unused : HOT_TAKES)
+    s.hotTakesUsed.push(text)
+    s.auto = null
+    s.phase = 'hotTake'
+    s.hotTake = {
+      key: `ht-${s.round}-${Date.now()}`,
+      text,
+      stage: 'vote',
+      remaining: HOTTAKE_VOTE_MS,
+      stageEndsAt: performance.now() + HOTTAKE_VOTE_MS,
+      votes: {},
+      votesIn: 0,
+      votesNeeded: onlinePlayers().length,
+    }
+    commit()
+  }
+
+  const htReveal = () => {
+    const s = g.current
+    const h = s.hotTake
+    if (!h || h.stage !== 'vote') return
+    h.red = Object.entries(h.votes).filter(([, v]) => v === 'red').map(([id]) => id)
+    h.green = Object.entries(h.votes).filter(([, v]) => v === 'green').map(([id]) => id)
+    const total = h.red.length + h.green.length
+    h.pctRed = total ? Math.round((h.red.length / total) * 100) : 50
+    h.stage = 'reveal'
+    s.hotTakesDone.push({ text: h.text, pctRed: h.pctRed, red: h.red, green: h.green })
+    commit()
+  }
+
+  const htSpeaker = (id?: string) => {
+    const h = g.current.hotTake
+    if (!h || h.stage === 'vote' || !id || !g.current.players[id]) return
+    h.stage = 'speaker'
+    h.speaker = id
+    h.stageEndsAt = performance.now() + HOTTAKE_SPEAKER_MS
+    commit()
+  }
+
+  const htVerdict = () => {
+    const h = g.current.hotTake
+    if (!h || h.stage === 'vote') return
+    h.stage = 'verdict'
+    h.speaker = undefined
+    commit()
+  }
+
+  const htNext = () => {
+    const s = g.current
+    if (s.phase !== 'hotTake' && s.phase !== 'roundEnd') return
+    s.hotTake = null
+    startRound()
+  }
+
+  // --- end of the game ---
   const showAwards = () => {
     const s = g.current
     freeze()
     commitRoundScores()
     s.defense = null
+    s.hotTake = null
     const awards: Award[] = []
     for (const def of AWARD_DEFS) {
       const counter = s.counters[
@@ -468,9 +662,26 @@ export function useAdminGame(code: string) {
     persist(true)
   }
 
+  const showFinal = () => {
+    const s = g.current
+    if (s.phase !== 'podium' && s.phase !== 'awards') showPodium()
+    let mostDivided: FinalStats['mostDivided']
+    for (const h of s.hotTakesDone) {
+      if (!mostDivided || Math.abs(h.pctRed - 50) < Math.abs(mostDivided.pctRed - 50)) mostDivided = { text: h.text, pctRed: h.pctRed }
+    }
+    let mostToxic: FinalStats['mostToxic']
+    for (const [id, n] of Object.entries(s.counters.reds)) if (s.players[id] && (!mostToxic || n > mostToxic.count)) mostToxic = { playerId: id, count: n }
+    s.finalStats = { topRed: topOf(s.redStats), topMissedGreen: topOf(s.missStats), mostDivided, mostToxic }
+    s.phase = 'final'
+    s.auto = null
+    commit()
+    persist(true)
+  }
+
   const runAuto = (action: AutoAction) => {
     if (action === 'resume') finishDefense()
     else if (action === 'nextRound') startRound()
+    else if (action === 'hotTake') startHotTake()
     else if (action === 'awards') showAwards()
     else showPodium()
   }
@@ -496,17 +707,21 @@ export function useAdminGame(code: string) {
   /** "Next" button: skips whatever we are waiting for. */
   const skip = () => {
     const s = g.current
+    if (s.phase === 'intro') return openLobby()
+    if (s.phase === 'lobby') return startGame()
     if (s.phase === 'tutorial') return startRound()
     if (s.phase === 'defense' && s.defense?.stage === 'talk') return startVote()
     if (s.phase === 'defense' && s.defense?.stage === 'vote') return resolveVote()
+    if (s.phase === 'hotTake' && s.hotTake?.stage === 'vote') return htReveal()
+    if (s.phase === 'hotTake') return htNext()
+    if (s.phase === 'podium') return showFinal()
     if (s.auto) return runAuto(s.auto.action)
   }
 
   const backToLobby = () => {
     const s = g.current
-    const keepPlayers = s.players
-    g.current = freshGame(s.createdAt)
-    g.current.players = keepPlayers
+    g.current = freshGame(s)
+    g.current.phase = 'lobby'
     ticks.current = {}
     main.current?.send('reset', {})
     commit()
@@ -528,6 +743,7 @@ export function useAdminGame(code: string) {
       s.roundScores[t.id] = t.score
       s.hearts[t.id] = t.hearts
       if (s.totals[t.id] == null) s.totals[t.id] = 0
+      if (!s.roundIds.includes(t.id)) s.roundIds.push(t.id)
     }
   }
 
@@ -540,10 +756,9 @@ export function useAdminGame(code: string) {
     const t = elapsed()
     if (m.kind === 'red' && m.text) {
       inc(s.counters.reds, m.id)
-      for (const map of [s.redStats, s.roundRed]) {
-        const list = (map[m.text] ??= [])
-        if (!list.includes(m.id)) list.push(m.id)
-      }
+      addId(s.redStats, m.text, m.id)
+      addId(s.roundRed, m.text, m.id)
+      if (m.grey) s.greyReds.push({ id: m.id, text: m.text })
       const canDefend =
         s.phase === 'playing' && s.running && !s.defenseDone && t >= DEFENSE_AFTER_MS && t < roundConfig(s.round).durationMs
       if (canDefend) {
@@ -569,8 +784,8 @@ export function useAdminGame(code: string) {
   const handleMiss = (m: MissMsg) => {
     const s = g.current
     if (m.round !== s.round) return
-    const list = (s.missStats[m.text] ??= [])
-    if (!list.includes(m.id)) list.push(m.id)
+    addId(s.missStats, m.text, m.id)
+    addId(s.roundMiss, m.text, m.id)
   }
 
   const handlePower = (m: PowerMsg) => {
@@ -585,6 +800,8 @@ export function useAdminGame(code: string) {
       announce('BLOCKED BY THERAPY!', '#22d3ee', `${s.players[m.to].name} was protected`, 'shield')
     } else {
       inc(s.counters.received, m.to)
+      const row = (s.sabotagePairs[m.from] ??= {})
+      row[m.to] = (row[m.to] ?? 0) + 1
       announce('BETRAYAL!', '#a855f7', undefined, 'sabotage')
       setSabotages((list) => [...list, ev].slice(-6))
     }
@@ -599,8 +816,78 @@ export function useAdminGame(code: string) {
     else commit()
   }
 
-  const handlers = useRef({ handleTick, handleCatch, handleMiss, handlePower, handleVote })
-  handlers.current = { handleTick, handleCatch, handleMiss, handlePower, handleVote }
+  const handleHotTakeVote = (v: HotTakeVoteMsg) => {
+    const h = g.current.hotTake
+    if (!h || h.stage !== 'vote' || v.key !== h.key || (v.vote !== 'red' && v.vote !== 'green')) return
+    h.votes[v.id] = v.vote
+    h.votesIn = Object.keys(h.votes).length
+    if (h.votesIn >= h.votesNeeded) htReveal()
+    else commit()
+  }
+
+  // --- host (moderator) ---
+  const hostPassword = () => ENV_HOST_PASSWORD || g.current.hostPin
+
+  const runHostCmd = (c: HostCmd) => {
+    switch (c.cmd) {
+      case 'openLobby':
+        return openLobby()
+      case 'start':
+        return g.current.phase === 'intro' ? openLobby() : startGame()
+      case 'pause':
+        return togglePause()
+      case 'skip':
+        return skip()
+      case 'endRound':
+        return endRound()
+      case 'awards':
+        return showAwards()
+      case 'podium':
+        return showPodium()
+      case 'final':
+        return showFinal()
+      case 'playAgain':
+        return backToLobby()
+      case 'objection':
+        return objection()
+      case 'vote':
+        return startVote()
+      case 'htReveal':
+        return htReveal()
+      case 'htSpeaker':
+        return htSpeaker(c.arg)
+      case 'htVerdict':
+        return htVerdict()
+      case 'htNext':
+        return htNext()
+    }
+  }
+
+  const handlers = useRef({ handleTick, handleCatch, handleMiss, handlePower, handleVote, handleHotTakeVote, runHostCmd })
+  handlers.current = { handleTick, handleCatch, handleMiss, handlePower, handleVote, handleHotTakeVote, runHostCmd }
+
+  const listenToHost = useCallback(
+    (token: string) => {
+      if (hostRooms.current[token]) return
+      const room = openChannel(hostTopic(code, token))
+      room.on<HostCmd>('cmd', (c) => {
+        // only commands that carry this channel's valid token
+        if (!c || c.token !== token || !g.current.hostTokens.includes(token)) return
+        lastHostSeen.current = performance.now()
+        setHostOnline(true)
+        handlers.current.runHostCmd(c)
+      })
+      room.on<{ token: string }>('hello', (m) => {
+        if (m?.token !== token) return
+        lastHostSeen.current = performance.now()
+        setHostOnline(true)
+        sendHostInfo(buildState(), true)
+      })
+      room.subscribe(() => sendHostInfo(buildState(), true))
+      hostRooms.current[token] = room
+    },
+    [code, buildState, sendHostInfo]
+  )
 
   const listenToPlayer = useCallback(
     (id: string) => {
@@ -611,6 +898,7 @@ export function useAdminGame(code: string) {
       room.on<MissMsg>('miss', (m) => handlers.current.handleMiss(m))
       room.on<PowerMsg>('power', (m) => handlers.current.handlePower(m))
       room.on<VoteMsg>('vote', (m) => handlers.current.handleVote(m))
+      room.on<HotTakeVoteMsg>('htvote', (m) => handlers.current.handleHotTakeVote(m))
       room.subscribe()
       playerRooms.current[id] = room
     },
@@ -623,6 +911,25 @@ export function useAdminGame(code: string) {
     main.current = room
     room.on('hello', () => {
       if (performance.now() - lastBroadcast.current > 300) broadcast()
+    })
+    room.on<HostLoginMsg>('host-login', (m) => {
+      if (!m?.nonce || !m.proof) return
+      // at most 5 attempts every 10 s
+      const now = Date.now()
+      loginAttempts.current = loginAttempts.current.filter((t) => now - t < 10_000)
+      if (loginAttempts.current.length >= 5) return
+      loginAttempts.current.push(now)
+      const pw = hostPassword()
+      const ok = m.proof === loginProof(pw, code, m.nonce)
+      const reply: HostAuthMsg = { nonce: m.nonce, ok }
+      if (ok) {
+        const token = randomHex(32)
+        g.current.hostTokens = [...g.current.hostTokens.slice(-4), token]
+        listenToHost(token)
+        reply.enc = xorToken(token, pw, m.nonce)
+        persist(true)
+      }
+      room.send('host-auth', reply)
     })
     room.channel.on('presence', { event: 'sync' }, () => {
       const ps = room.channel.presenceState<PresenceMeta>()
@@ -643,37 +950,43 @@ export function useAdminGame(code: string) {
         listenToPlayer(m.id)
       }
       for (const p of Object.values(s.players)) if (!seen.has(p.id)) p.online = false
-      // in the lobby, forget players who left and never played
-      if (s.phase === 'lobby') {
+      // before the game, forget players who left and never played
+      if (s.phase === 'lobby' || s.phase === 'intro') {
         for (const id of Object.keys(s.players)) if (!seen.has(id) && s.totals[id] == null) delete s.players[id]
       }
       bump()
+      sendHostInfo(buildState(), true)
       persist()
     })
     room.subscribe(() => {
       room.channel.track({ role: 'admin' }).catch(() => {})
       broadcast()
     })
-    // re-open listeners for remembered players (admin page reload)
+    // re-open listeners for remembered players and hosts (admin page reload)
     for (const id of Object.keys(g.current.players)) listenToPlayer(id)
+    for (const token of g.current.hostTokens) listenToHost(token)
 
     const rooms = playerRooms.current
+    const hosts = hostRooms.current
     return () => {
       room.close()
       for (const r of Object.values(rooms)) r.close()
+      for (const r of Object.values(hosts)) r.close()
       playerRooms.current = {}
+      hostRooms.current = {}
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code])
 
   // --- game loop (timers, heartbeat) ---
-  const loopFns = useRef({ startRound, startVote, resolveVote, endRound, runAuto })
-  loopFns.current = { startRound, startVote, resolveVote, endRound, runAuto }
+  const loopFns = useRef({ startRound, startVote, resolveVote, endRound, runAuto, htReveal })
+  loopFns.current = { startRound, startVote, resolveVote, endRound, runAuto, htReveal }
   useEffect(() => {
     const id = setInterval(() => {
       const s = g.current
       const now = performance.now()
       const fns = loopFns.current
+      if (hostOnline && now - lastHostSeen.current > 20_000) setHostOnline(false)
       if (s.phase === 'tutorial' && now >= s.tutorialEndsAt) return fns.startRound()
       if (s.phase === 'playing' && s.running) {
         const t = elapsed()
@@ -686,11 +999,19 @@ export function useAdminGame(code: string) {
       }
       if (s.phase === 'defense' && s.defense?.stage === 'talk' && now >= s.defense.stageEndsAt) return fns.startVote()
       if (s.phase === 'defense' && s.defense?.stage === 'vote' && now >= s.defense.stageEndsAt) return fns.resolveVote()
+      if (s.phase === 'hotTake' && s.hotTake?.stage === 'vote' && now >= s.hotTake.stageEndsAt) return fns.htReveal()
+      if (s.phase === 'hotTake' && s.hotTake?.stage === 'speaker' && now >= s.hotTake.stageEndsAt) {
+        // speaker time is over: back to the two sides (the host decides what's next)
+        s.hotTake.stage = 'reveal'
+        s.hotTake.speaker = undefined
+        bump()
+        return broadcast()
+      }
       if (s.auto && !s.auto.paused && now >= s.auto.endsAt) return fns.runAuto(s.auto.action)
       if (now - lastBroadcast.current > 1500) broadcast()
     }, 100)
     return () => clearInterval(id)
-  }, [elapsed, broadcast, announce])
+  }, [elapsed, broadcast, announce, bump, hostOnline])
 
   // remove finished sabotage animations and announcements
   useEffect(() => {
@@ -712,7 +1033,26 @@ export function useAdminGame(code: string) {
     status,
     sabotages,
     announcements,
+    objectionKey,
+    hostOnline,
+    usesPin: !ENV_HOST_PASSWORD,
     elapsed,
-    actions: { startGame, startRound, togglePause, endRound, skip, showAwards, showPodium, backToLobby },
+    actions: {
+      openLobby,
+      startGame,
+      startRound,
+      togglePause,
+      endRound,
+      skip,
+      objection,
+      showAwards,
+      showPodium,
+      showFinal,
+      backToLobby,
+      htReveal,
+      htSpeaker,
+      htVerdict,
+      htNext,
+    },
   }
 }

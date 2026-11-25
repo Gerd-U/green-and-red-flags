@@ -63,7 +63,48 @@ export interface ScheduledCard {
   grey?: boolean
 }
 
-export type Phase = 'lobby' | 'tutorial' | 'playing' | 'defense' | 'roundEnd' | 'awards' | 'podium'
+export type Phase =
+  | 'intro'
+  | 'lobby'
+  | 'tutorial'
+  | 'playing'
+  | 'defense'
+  | 'roundEnd'
+  | 'hotTake'
+  | 'awards'
+  | 'podium'
+  | 'final'
+
+export type HotTakeStage = 'vote' | 'reveal' | 'speaker' | 'verdict'
+
+export interface HotTake {
+  key: string
+  text: string
+  stage: HotTakeStage
+  /** ms left of the vote (stage vote) or of the speaker (stage speaker) */
+  remaining: number
+  votesIn: number
+  votesNeeded: number
+  /** revealed after the vote */
+  red?: string[]
+  green?: string[]
+  pctRed?: number
+  /** player who has the word (stage speaker) */
+  speaker?: string
+}
+
+export interface HotTakeVoteMsg {
+  id: string
+  key: string
+  vote: 'red' | 'green'
+}
+
+export interface FinalStats {
+  topRed?: { text: string; count: number }
+  topMissedGreen?: { text: string; count: number }
+  mostDivided?: { text: string; pctRed: number }
+  mostToxic?: { playerId: string; count: number }
+}
 
 export type DefenseStage = 'talk' | 'vote' | 'result'
 
@@ -82,6 +123,8 @@ export interface Defense {
   convinced?: number
   notConvinced?: number
   result?: 'convinced' | 'not'
+  /** how many times the host said "Objection!" */
+  objections?: number
 }
 
 /** Countdown that moves the game forward on its own (admin can pause/skip it). */
@@ -128,12 +171,14 @@ export interface GameState {
   /** last hearts each phone reported (used to recover after a reload) */
   hearts: Record<string, number>
   defense: Defense | null
+  hotTake: HotTake | null
   auto: AutoAdvance | null
   /** ms left in the tutorial */
   tutorialLeft?: number
   summary?: RoundSummary
   awards?: Award[]
   stats?: PodiumStats
+  finalStats?: FinalStats
   /** sequence number, increases on every state message */
   seq: number
 }
@@ -233,4 +278,38 @@ export interface PlayerInfo {
   bio: string
   ready: boolean
   online: boolean
+}
+
+/** Data the host's script needs (names are resolved on the host phone). */
+export interface ScriptData {
+  /** red flags caught this round (or the last round), full text -> player ids */
+  roundRed: { text: string; ids: string[] }[]
+  /** greens that fell this round, full text -> ids of players who missed them */
+  roundMiss: { text: string; ids: string[] }[]
+  /** grey red cards caught this round (they looked neutral) */
+  greyReds: { id: string; text: string }[]
+  /** sabotages sent this game */
+  sabotages: { from: string; to: string; n: number }[]
+  /** finished hot takes */
+  hotTakes: { text: string; pctRed: number; red: string[]; green: string[] }[]
+  /** players who were in the round (to know if "nobody" caught a green) */
+  activeIds: string[]
+  reds: Record<string, number>
+}
+
+export interface HostPlayer {
+  id: string
+  name: string
+  avatar: AvatarConfig
+  online: boolean
+  ready: boolean
+}
+
+/** Admin -> host (private channel): everything the host view shows. */
+export interface HostInfo {
+  state: GameState
+  players: HostPlayer[]
+  /** ms since the room was created */
+  activityMs: number
+  script: ScriptData
 }

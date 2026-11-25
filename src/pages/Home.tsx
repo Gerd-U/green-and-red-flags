@@ -53,9 +53,14 @@ export default function Home() {
             Join as player
           </button>
           <div className="divider"><span>or</span></div>
-          <button type="button" className="btn btn-ghost" onClick={() => nav('/admin')}>
-            Host a game (big screen)
-          </button>
+          <div className="home-row">
+            <button type="button" className="btn btn-ghost" onClick={() => nav('/admin')}>
+              🖥️ Host a game (big screen)
+            </button>
+            <button type="button" className="btn btn-gold" onClick={() => nav('/host')}>
+              🎤 I&apos;m the host
+            </button>
+          </div>
         </form>
       </div>
     </div>
