@@ -66,12 +66,14 @@ export function xorToken(token: string, password: string, nonce: string): string
 
 export const hostTopic = (code: string, token: string) => `gr-${code}-h-${hash32(token).slice(0, 12)}`
 
-/** Password from VITE_HOST_PASSWORD; empty = the admin generates a 4-digit PIN. */
-export const ENV_HOST_PASSWORD = (import.meta.env.VITE_HOST_PASSWORD ?? '').trim()
-
-export function makePin(): string {
-  return String(1000 + Math.floor(Math.random() * 9000))
-}
+/** Default host password, used when VITE_HOST_PASSWORD is empty. */
+export const DEFAULT_HOST_PASSWORD = 'Alfa12'
+/**
+ * The host password: VITE_HOST_PASSWORD if it has a value, otherwise "Alfa12".
+ * Case-sensitive; spaces at the start/end are ignored (on both sides, see
+ * loginProof). It is never shown on the projector.
+ */
+export const HOST_PASSWORD = (import.meta.env.VITE_HOST_PASSWORD ?? '').trim() || DEFAULT_HOST_PASSWORD
 
 // ---- host session on this phone ----
 export interface HostSession {

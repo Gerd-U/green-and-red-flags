@@ -5,7 +5,7 @@ import PolyBackground from '../components/PolyBackground'
 import { ACTIVITY_LIMIT_MIN, formatClock, PLAN, roundConfig, TOTAL_ROUNDS, HOTTAKE_AFTER_ROUNDS } from '../lib/game'
 import {
   clearHostSession,
-  ENV_HOST_PASSWORD,
+  HOST_PASSWORD,
   hostTopic,
   loadHostSession,
   loginProof,
@@ -78,16 +78,14 @@ function HostLogin({ onLogin }: { onLogin: (s: HostSession) => void }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  // DEV ONLY (/dev/bots harness): log in by itself with the env password or
-  // the PIN the admin saved in this browser's localStorage.
+  // DEV ONLY (/dev/bots harness): log in by itself with the host password
+  // ("Alfa12" unless VITE_HOST_PASSWORD says otherwise).
   useEffect(() => {
     if (!import.meta.env.DEV || params.get('autologin') !== '1') return
     const c = normalizeCode(params.get('room'))
     let stop = false
     const tryLogin = async () => {
-      const pin = load<{ hostPin?: string } | null>('gr.admin', null)?.hostPin ?? ''
-      const pw = ENV_HOST_PASSWORD || pin
-      if (!pw) return setTimeout(() => !stop && tryLogin(), 1000)
+      const pw = params.get('pw') ?? HOST_PASSWORD
       try {
         const s = await hostLogin(c, pw)
         saveHostSession(s)
@@ -116,7 +114,7 @@ function HostLogin({ onLogin }: { onLogin: (s: HostSession) => void }) {
     } catch (err) {
       setError(
         (err as Error).message === 'wrong'
-          ? 'Wrong password or PIN. Try again.'
+          ? 'Wrong password. Try again.'
           : "The projector didn't answer. Is /admin open with this room code?"
       )
     } finally {
@@ -144,7 +142,7 @@ function HostLogin({ onLogin }: { onLogin: (s: HostSession) => void }) {
           maxLength={4}
         />
         <label className="label" htmlFor="hpass">
-          Host password or PIN
+          Host password
         </label>
         <input
           id="hpass"

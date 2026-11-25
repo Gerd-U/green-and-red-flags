@@ -25,14 +25,8 @@ export default function Admin() {
 }
 
 function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void }) {
-  const { g, ticks, catchFx, status, sabotages, announcements, objectionKey, hostOnline, usesPin, elapsed, actions } = useAdminGame(code)
+  const { g, ticks, catchFx, status, sabotages, announcements, objectionKey, hostOnline, elapsed, actions } = useAdminGame(code)
   const [, setTick] = useState(0)
-  const [showPin, setShowPin] = useState(false)
-  useEffect(() => {
-    if (!showPin) return
-    const id = setTimeout(() => setShowPin(false), 6000)
-    return () => clearTimeout(id)
-  }, [showPin])
 
   // light re-render for timers / ranking
   useEffect(() => {
@@ -339,13 +333,6 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       {inRound && sabotages[0] && <SabotageAnim ev={sabotages[0]} players={game.players} />}
       {game.phase !== 'defense' && <Announcer items={announcements} />}
       {game.phase === 'defense' && <ObjectionOverlay k={objectionKey} />}
-
-      {/* host PIN: only when no VITE_HOST_PASSWORD is set; small and hidden on purpose */}
-      {usesPin && (
-        <button className={`pin-corner ${showPin ? 'open' : ''}`} onClick={() => setShowPin((v) => !v)}>
-          {showPin ? `Host PIN: ${game.hostPin}` : 'Show host PIN'}
-        </button>
-      )}
     </div>
   )
 }

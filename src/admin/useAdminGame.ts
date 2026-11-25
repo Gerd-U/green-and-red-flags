@@ -24,10 +24,9 @@ import {
   TUTORIAL_MS,
 } from '../lib/game'
 import {
-  ENV_HOST_PASSWORD,
+  HOST_PASSWORD,
   hostTopic,
   loginProof,
-  makePin,
   randomHex,
   xorToken,
   type HostAuthMsg,
@@ -149,8 +148,6 @@ export interface AdminGame {
   sabotagePairs: Record<string, Record<string, number>>
   roundIds: string[]
   createdAt: number
-  /** 4-digit PIN when VITE_HOST_PASSWORD is not set */
-  hostPin: string
   /** tokens of logged-in hosts (kept on reload) */
   hostTokens: string[]
   seq: number
@@ -167,7 +164,7 @@ function emptyCounters(): AdminGame['counters'] {
   return { reds: {}, sent: {}, received: {}, icks: {}, lawyer: {} }
 }
 
-function freshGame(keep?: Pick<AdminGame, 'createdAt' | 'players' | 'hostPin' | 'hostTokens'>): AdminGame {
+function freshGame(keep?: Pick<AdminGame, 'createdAt' | 'players' | 'hostTokens'>): AdminGame {
   return {
     phase: 'intro',
     round: 0,
@@ -197,7 +194,6 @@ function freshGame(keep?: Pick<AdminGame, 'createdAt' | 'players' | 'hostPin' | 
     sabotagePairs: {},
     roundIds: [],
     createdAt: keep?.createdAt ?? Date.now(),
-    hostPin: keep?.hostPin ?? makePin(),
     hostTokens: keep?.hostTokens ?? [],
     seq: 0,
   }
@@ -215,7 +211,7 @@ export function clearAdminSnapshot() {
 
 function gameFromSnapshot(s: Snapshot | null): AdminGame {
   const g = freshGame()
-  if (!s || typeof s.gameSeed !== 'number' || typeof s.hostPin !== 'string') return g
+  if (!s || typeof s.gameSeed !== 'number' || !Array.isArray(s.hostTokens)) return g
   Object.assign(g, s)
   // a reload during a defense/tutorial/hot take comes back paused in a safe phase
   if (s.phase === 'defense') g.phase = 'playing'
@@ -826,7 +822,6 @@ export function useAdminGame(code: string) {
   }
 
   // --- host (moderator) ---
-  const hostPassword = () => ENV_HOST_PASSWORD || g.current.hostPin
 
   const runHostCmd = (c: HostCmd) => {
     switch (c.cmd) {
@@ -919,7 +914,7 @@ export function useAdminGame(code: string) {
       loginAttempts.current = loginAttempts.current.filter((t) => now - t < 10_000)
       if (loginAttempts.current.length >= 5) return
       loginAttempts.current.push(now)
-      const pw = hostPassword()
+      const pw = HOST_PASSWORD
       const ok = m.proof === loginProof(pw, code, m.nonce)
       const reply: HostAuthMsg = { nonce: m.nonce, ok }
       if (ok) {
@@ -1035,7 +1030,6 @@ export function useAdminGame(code: string) {
     announcements,
     objectionKey,
     hostOnline,
-    usesPin: !ENV_HOST_PASSWORD,
     elapsed,
     actions: {
       openLobby,
