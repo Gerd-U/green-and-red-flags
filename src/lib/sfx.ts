@@ -19,6 +19,7 @@ export type Sfx =
   | 'vote'
   | 'award'
   | 'last10'
+  | 'objection'
 
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
@@ -165,6 +166,11 @@ export function playSfx(name: Sfx, opts: { level?: number } = {}) {
     case 'roundEnd':
       ;[0, 4, 7, 12].forEach((s, i) => tone(N(12 + s), t + i * 0.12, 0.25, 'square', 0.12))
       tone(N(24), t + 0.5, 0.6, 'triangle', 0.14)
+      break
+    case 'objection':
+      noise(t, 0.12, 0.3, 500)
+      tone(110, t, 0.25, 'square', 0.2, 80)
+      ;[0, 3, 7].forEach((s, i) => tone(N(s + 5), t + 0.15 + i * 0.07, 0.35, 'sawtooth', 0.12))
       break
     case 'award':
       ;[0, 7, 12, 16, 19, 24].forEach((s, i) => tone(N(s + 7), t + i * 0.08, 0.3, 'square', 0.1))

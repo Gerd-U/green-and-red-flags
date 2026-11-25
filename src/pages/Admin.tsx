@@ -8,6 +8,7 @@ import { duckMusic, isMusicOn, isSfxOn, playSfx, setMusicOn, setMusicTempo, setS
 import LiveGrid from '../admin/LiveGrid'
 import { Announcer, AwardsShow, DefenseView, Lobby, Podium, Ranking, RoundResults, SabotageAnim, type RankRow } from '../admin/Panels'
 import { clearAdminSnapshot, loadAdminSnapshot, useAdminGame } from '../admin/useAdminGame'
+import { FinalThoughts, HotTakeView, IntroScreen, ObjectionOverlay } from '../admin/Stages'
 
 export default function Admin() {
   const [code, setCode] = useState(() => loadAdminSnapshot()?.code ?? makeRoomCode())
@@ -24,8 +25,14 @@ export default function Admin() {
 }
 
 function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void }) {
-  const { g, ticks, catchFx, status, sabotages, announcements, elapsed, actions } = useAdminGame(code)
+  const { g, ticks, catchFx, status, sabotages, announcements, objectionKey, hostOnline, usesPin, elapsed, actions } = useAdminGame(code)
   const [, setTick] = useState(0)
+  const [showPin, setShowPin] = useState(false)
+  useEffect(() => {
+    if (!showPin) return
+    const id = setTimeout(() => setShowPin(false), 6000)
+    return () => clearTimeout(id)
+  }, [showPin])
 
   // light re-render for timers / ranking
   useEffect(() => {
@@ -74,13 +81,13 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       stopMusic()
     }
   }, [])
-  const bpm = game.phase === 'lobby' || game.phase === 'tutorial' ? 100 : [108, 120, 134][Math.max(0, game.round - 1)] ?? 112
+  const bpm = game.phase === 'intro' || game.phase === 'lobby' || game.phase === 'tutorial' ? 100 : [108, 120, 134][Math.max(0, game.round - 1)] ?? 112
   useEffect(() => setMusicTempo(bpm), [bpm])
   const talking = game.phase === 'defense' && game.defense?.stage !== 'result'
-  const discussing = game.phase === 'roundEnd'
+  const discussing = game.phase === 'roundEnd' || game.phase === 'hotTake' || game.phase === 'final' || game.phase === 'intro'
   useEffect(() => duckMusic(talking || discussing), [talking, discussing])
   // phase / countdown / announcement sounds
-  const prev = useRef({ phase: game.phase, countdown: 0, ann: -1, award: -1, stage: '' })
+  const prev = useRef({ phase: game.phase, countdown: 0, ann: -1, award: -1, stage: '', ht: '', objection: 0 })
   const awardIdx = game.phase === 'awards' && auto ? Math.floor(Math.max(0, Math.max(1, game.awards?.length ?? 0) * AWARD_SHOW_MS + 1500 - autoLeft) / AWARD_SHOW_MS) : -1
   useEffect(() => {
     const p = prev.current
@@ -104,6 +111,18 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
     if (awardIdx !== p.award) {
       if (awardIdx >= 0) playSfx('award')
       p.award = awardIdx
+    }
+    const ht = game.hotTake ? `${game.hotTake.stage}-${game.hotTake.speaker ?? ''}` : ''
+    if (ht !== p.ht) {
+      if (game.hotTake?.stage === 'vote') playSfx('defense')
+      if (game.hotTake?.stage === 'reveal') playSfx('roundEnd')
+      if (game.hotTake?.stage === 'speaker') playSfx('announce')
+      if (game.hotTake?.stage === 'verdict') playSfx('award')
+      p.ht = ht
+    }
+    if (objectionKey !== p.objection) {
+      if (objectionKey) playSfx('objection')
+      p.objection = objectionKey
     }
     const a = announcements[0]
     if (a && a.key !== p.ann) {
@@ -130,7 +149,8 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
         <div className="admin-clock" title="Activity time since the room was created">
           ⏱ {formatClock(activity)}
         </div>
-        {game.round > 0 && game.phase !== 'podium' && game.phase !== 'awards' && (
+        {hostOnline && <div className="admin-host" title="The host is connected">🎤 Host</div>}
+        {game.round > 0 && game.phase !== 'podium' && game.phase !== 'awards' && game.phase !== 'final' && (
           <div className="admin-round">
             Round <b>{game.round}</b> of {TOTAL_ROUNDS} · {cfg.name}
             {inRound && (
@@ -142,6 +162,11 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
           </div>
         )}
         <div className="admin-actions">
+          {game.phase === 'intro' && (
+            <button className="btn btn-green" onClick={actions.openLobby}>
+              Open lobby ▶
+            </button>
+          )}
           {game.phase === 'lobby' && (
             <button className="btn btn-green" disabled={readyCount === 0} onClick={actions.startGame}>
               Start game ▶
@@ -169,6 +194,11 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
                   {auto.paused ? '▶ Resume' : '⏸ Hold'}
                 </button>
               )}
+              {game.defense?.stage === 'talk' && (
+                <button className="btn btn-gold" onClick={actions.objection}>
+                  Objection!
+                </button>
+              )}
               <button className="btn btn-green" onClick={actions.skip}>
                 {game.defense?.stage === 'talk' ? 'Start vote ⏭' : game.defense?.stage === 'vote' ? 'Close vote ⏭' : 'Continue ▶'}
               </button>
@@ -184,8 +214,29 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
               </button>
             </>
           )}
+          {game.phase === 'hotTake' && game.hotTake && (
+            <>
+              {game.hotTake.stage === 'vote' ? (
+                <button className="btn btn-green" onClick={actions.htReveal}>
+                  Reveal ▶
+                </button>
+              ) : (
+                <button className="btn btn-gold" onClick={actions.htVerdict}>
+                  Host&apos;s verdict
+                </button>
+              )}
+              <button className="btn btn-green" onClick={actions.htNext}>
+                Next round ▶
+              </button>
+            </>
+          )}
           {game.phase === 'podium' && (
-            <button className="btn btn-green" onClick={actions.backToLobby}>
+            <button className="btn btn-green" onClick={actions.showFinal}>
+              Final thoughts ▶
+            </button>
+          )}
+          {(game.phase === 'podium' || game.phase === 'final') && (
+            <button className="btn btn-ghost" onClick={actions.backToLobby}>
               Play again
             </button>
           )}
@@ -219,6 +270,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       </header>
 
       <main className="admin-main">
+        {game.phase === 'intro' && <IntroScreen code={code} joinUrl={joinUrl} players={lobbyPlayers.length} />}
         {game.phase === 'lobby' && <Lobby players={lobbyPlayers} code={code} joinUrl={joinUrl} />}
 
         {game.phase === 'tutorial' && (
@@ -258,7 +310,13 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
           />
         )}
 
+        {game.phase === 'hotTake' && game.hotTake && (
+          <HotTakeView h={game.hotTake} players={game.players} left={Math.max(0, game.hotTake.stageEndsAt - now)} />
+        )}
+
         {game.phase === 'podium' && <Podium rows={rows} stats={game.stats} />}
+
+        {game.phase === 'final' && <FinalThoughts stats={game.finalStats} players={game.players} />}
       </main>
 
       {countdown > 0 && (
@@ -280,6 +338,14 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
 
       {inRound && sabotages[0] && <SabotageAnim ev={sabotages[0]} players={game.players} />}
       {game.phase !== 'defense' && <Announcer items={announcements} />}
+      {game.phase === 'defense' && <ObjectionOverlay k={objectionKey} />}
+
+      {/* host PIN: only when no VITE_HOST_PASSWORD is set; small and hidden on purpose */}
+      {usesPin && (
+        <button className={`pin-corner ${showPin ? 'open' : ''}`} onClick={() => setShowPin((v) => !v)}>
+          {showPin ? `Host PIN: ${game.hostPin}` : 'Show host PIN'}
+        </button>
+      )}
     </div>
   )
 }

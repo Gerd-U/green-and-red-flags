@@ -213,6 +213,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
   const [pendingPowers, setPendingPowers] = useState<PowerId[]>([])
   const [tilt, setTilt] = useState(false)
   const [votedKey, setVotedKey] = useState<string | null>(null)
+  const [htVote, setHtVote] = useState<{ key: string; vote: 'red' | 'green' } | null>(null)
   const [soundOn, setSound] = useState(isSfxOn())
   const mainRef = useRef<Room | null>(null)
   const mineRef = useRef<Room | null>(null)
@@ -387,6 +388,8 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
   const autoLeft = useCountdown(state?.auto?.remaining, state?.seq, state?.auto?.paused)
   const stageLeft = useCountdown(defense?.remaining, state?.seq)
   const tutorialLeft = useCountdown(state?.tutorialLeft, state?.seq)
+  const hot = state?.hotTake ?? null
+  const htLeft = useCountdown(hot?.remaining, state?.seq)
 
   // auto-pick a random target if the player does not choose in time
   useEffect(() => {
@@ -415,6 +418,25 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
     }, 500 + Math.random() * 3000)
     return () => clearTimeout(t)
   }, [bot, defense, me, votedKey])
+
+  const voteHotTake = (v: 'red' | 'green') => {
+    if (!hot) return
+    mineRef.current?.send('htvote', { id: me, key: hot.key, vote: v })
+    setHtVote({ key: hot.key, vote: v })
+    playSfx('vote')
+  }
+
+  // bots vote the Hot Take randomly too
+  useEffect(() => {
+    if (!bot || !hot || hot.stage !== 'vote' || htVote?.key === hot.key) return
+    const key = hot.key
+    const t = setTimeout(() => {
+      const v = Math.random() < 0.5 ? 'red' : 'green'
+      mineRef.current?.send('htvote', { id: me, key, vote: v })
+      setHtVote({ key, vote: v })
+    }, 800 + Math.random() * 4000)
+    return () => clearTimeout(t)
+  }, [bot, hot, htVote, me])
 
   const vote = (v: 'convinced' | 'not') => {
     if (!defense) return
@@ -459,7 +481,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
             <span className="chip">Room {code}</span>
             <span className={`dot ${status === 'SUBSCRIBED' ? 'on' : ''}`} />
           </div>
-          {phase === 'podium' || phase === 'awards' ? (
+          {phase === 'podium' || phase === 'awards' || phase === 'final' ? (
             <div className="wait-center">
               <div className="big-place">#{myPlace || '-'}</div>
               <Avatar config={avatar} size={150} pose={myPlace === 1 ? 'dance' : myPlace <= 3 ? 'cheer' : 'idle'} />
@@ -582,6 +604,48 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
             <div className="auto-line">
               {state.auto.paused ? '⏸ ' : ''}
               {state.auto.label} in {Math.ceil(autoLeft / 1000)}s
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* hot take */}
+      {phase === 'hotTake' && hot && (
+        <div className="overlay hottake-phone">
+          <div className="chip">🔥 Hot Take</div>
+          <p className="quote ht-phone-text">“{hot.text}”</p>
+          {hot.stage === 'vote' &&
+            (htVote?.key === hot.key ? (
+              <h2 className="shout">
+                You voted {htVote.vote === 'red' ? '🟥 RED' : '🟩 GREEN'}. Secret until the reveal!
+              </h2>
+            ) : (
+              <div className="vote-buttons">
+                <div className="vote-timer">Red or green? {Math.ceil(htLeft / 1000)}s</div>
+                <button className="btn btn-red btn-huge" onClick={() => voteHotTake('red')}>
+                  🟥 RED FLAG
+                </button>
+                <button className="btn btn-green btn-huge" onClick={() => voteHotTake('green')}>
+                  🟩 GREEN FLAG
+                </button>
+              </div>
+            ))}
+          {hot.stage !== 'vote' && (
+            <div className="ht-phone-result">
+              <div className="ht-bar">
+                <div className="ht-bar-red" style={{ width: `${hot.pctRed ?? 0}%` }}>
+                  {hot.pctRed}% red
+                </div>
+                <div className="ht-bar-green">{100 - (hot.pctRed ?? 0)}% green</div>
+              </div>
+              {htVote?.key === hot.key && <p className="muted">You voted {htVote.vote.toUpperCase()}.</p>}
+              {hot.stage === 'speaker' && (
+                <h2 className="shout">
+                  {hot.speaker === me ? '🎤 Your turn! Explain your vote.' : `🎤 ${nameOf(hot.speaker ?? '')} has the word`}
+                </h2>
+              )}
+              {hot.stage === 'verdict' && <h2 className="shout">👑 Listen to the host&apos;s verdict</h2>}
+              {hot.stage === 'reveal' && <h2 className="shout">Look at the big screen!</h2>}
             </div>
           )}
         </div>
