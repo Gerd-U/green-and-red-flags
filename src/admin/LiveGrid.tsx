@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState, type MutableRefObject } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { buildSchedule, CARD_H, CARD_W, PLAYER_W, PLAYER_Y } from '../lib/game'
+import { buildSchedule, CARD_H, CARD_W, comboMult, PLAYER_W, PLAYER_Y, START_HEARTS } from '../lib/game'
 import type { MiniCard, PlayerInfo } from '../lib/types'
-import type { TickBuffer } from './useAdminGame'
+import type { CatchFx, TickBuffer } from './useAdminGame'
 
 const DELAY = 150 // ms of interpolation delay (a bit more than one tick)
 
@@ -23,17 +23,21 @@ function interpolate(buf: TickBuffer | undefined, now: number) {
   return { x: prev.x + (cur.x - prev.x) * t, cards }
 }
 
+const BURST: Record<string, string> = { green: '♥', red: '💔', soulmate: '★', ick: '🤢', power: '✦' }
+
 interface Props {
   players: PlayerInfo[]
   ticks: MutableRefObject<Record<string, TickBuffer>>
-  lives: Record<string, number>
+  catchFx: MutableRefObject<CatchFx[]>
   scores: Record<string, number>
   seed: number
+  round: number
+  gameSeed: number
 }
 
-export default function LiveGrid({ players, ticks, lives, scores, seed }: Props) {
-  // same seed as the phones -> we know every card's text without sending it
-  const schedule = useMemo(() => buildSchedule(seed), [seed])
+export default function LiveGrid({ players, ticks, catchFx, scores, seed, round, gameSeed }: Props) {
+  // same seeds as the phones -> we know every card's text without sending it
+  const schedule = useMemo(() => buildSchedule(seed, round, gameSeed), [seed, round, gameSeed])
   const [, setFrame] = useState(0)
   useEffect(() => {
     let raf = 0
@@ -46,61 +50,83 @@ export default function LiveGrid({ players, ticks, lives, scores, seed }: Props)
   }, [])
 
   const now = performance.now()
-  const cols = players.length <= 2 ? players.length || 1 : players.length <= 4 ? players.length : players.length <= 6 ? 3 : 4
+  const n = players.length
+  const cols = n <= 2 ? n || 1 : n <= 4 ? n : n <= 6 ? 3 : 4
   return (
     <div className="live-grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
       {players.map((p) => {
         const buf = ticks.current[p.id]
         const view = interpolate(buf, now)
         const tick = buf?.cur
-        const fx = tick?.fx?.length ? tick.fx[tick.fx.length - 1] : undefined
+        const fx = tick?.fx?.length ? tick.fx[tick.fx.length - 1] : tick?.shield ? 'therapy' : undefined
         const stale = !buf || now - buf.curAt > 2500
-        const out = (lives[p.id] ?? 3) <= 0
+        const hearts = tick ? tick.hearts : START_HEARTS
+        const streak = tick?.streak ?? 0
+        const recent = catchFx.current.filter((c) => c.pid === p.id && now - c.at < 900)
+        const shaking = recent.some((c) => c.kind === 'red' && now - c.at < 350)
         return (
           <div
             key={p.id}
-            className={`mini ${fx ? `mini-fx-${fx}` : ''} ${out ? 'mini-out' : ''}`}
+            className={`mini ${fx ? `mini-fx-${fx}` : ''} ${shaking ? 'shake' : ''} ${tick?.hb ? 'mini-broken' : ''}`}
             style={{ ['--pc' as string]: p.avatar.topColor }}
           >
             <div className="mini-head">
               <span className="mini-name">{p.name}</span>
+              {streak >= 1 && <span className={`mini-combo lvl-${Math.min(streak, 3)}`}>x{comboMult(streak)}</span>}
               <span className="mini-lives">
-                {[0, 1, 2].map((i) => (
-                  <span key={i} className={i < (lives[p.id] ?? 3) ? 'heart on' : 'heart'}>
-                    ◆
+                {Array.from({ length: START_HEARTS }, (_, i) => (
+                  <span key={i} className={i < hearts ? 'heart on' : 'heart'}>
+                    ♥
                   </span>
                 ))}
               </span>
-              <span className="mini-score">{scores[p.id] ?? 0}</span>
+              <span className="mini-score">{Math.round(scores[p.id] ?? 0)}</span>
             </div>
             <div className="mini-field">
-              {view?.cards.map((c) => (
-                <div
-                  key={c.id}
-                  className={`mcard m-${c.k} ${fx === 'ghosting' ? 'ghost' : ''}`}
-                  style={{
-                    left: `${c.x * 100}%`,
-                    top: `${c.y * 100}%`,
-                    width: `${CARD_W * 100}%`,
-                    height: `${CARD_H * 100}%`,
-                  }}
-                >
-                  {c.k === 'p' ? POWERS[schedule[c.id]?.power ?? 'ghosting'].emoji : schedule[c.id]?.text}
-                </div>
-              ))}
+              {view?.cards.map((c) => {
+                const look = c.h ? 'grey' : { g: 'green', r: 'red', p: 'power', i: 'ick', s: 'soulmate' }[c.k]
+                const sc = schedule[c.id]
+                return (
+                  <div
+                    key={c.id}
+                    className={`mcard m-${look} ${fx === 'ghosting' ? 'ghost' : ''}`}
+                    style={{
+                      left: `${c.x * 100}%`,
+                      top: `${c.y * 100}%`,
+                      width: `${CARD_W * 100}%`,
+                      height: `${CARD_H * 100}%`,
+                    }}
+                  >
+                    {c.k === 'p' ? POWERS[sc?.power ?? 'ghosting'].emoji : sc?.text}
+                  </div>
+                )
+              })}
               <div
                 className="mini-char"
-                style={{ left: `${(view?.x ?? 0.5) * 100}%`, top: `${PLAYER_Y * 100}%`, width: `${PLAYER_W * 130}%` }}
+                style={{ left: `${(view?.x ?? 0.5) * 100}%`, top: `${PLAYER_Y * 100}%`, width: `${PLAYER_W * 120}%` }}
               >
-                <Avatar config={p.avatar} pose={tick?.mood === 'happy' ? 'cheer' : tick?.mood === 'horror' ? 'scared' : 'idle'} effect={fx} size={60} dim={out} />
+                <Avatar config={p.avatar} pose={tick?.pose ?? 'idle'} facing={tick?.f ?? 1} effect={fx} size={60} />
               </div>
+              {recent.map((c, i) => (
+                <div
+                  key={`${c.at}-${i}`}
+                  className={`burst burst-${c.kind} small`}
+                  style={{ left: `${(view?.x ?? 0.5) * 100}%`, top: `${PLAYER_Y * 100 - 6}%` }}
+                >
+                  {Array.from({ length: 6 }, (_, k) => (
+                    <i key={k} style={{ ['--a' as string]: `${k * 60 + 15}deg` }}>
+                      {BURST[c.kind] ?? '✦'}
+                    </i>
+                  ))}
+                </div>
+              ))}
               {fx && (
                 <div className="mini-fx-label" style={{ background: POWERS[fx].color }}>
                   {POWERS[fx].emoji} {POWERS[fx].name}
                 </div>
               )}
-              {stale && !out && <div className="mini-stale">connecting…</div>}
-              {out && <div className="mini-stale">💔 out</div>}
+              {tick?.hb && <div className="mini-stale broken">💔 Heartbroken</div>}
+              {stale && !tick?.hb && <div className="mini-stale">connecting…</div>}
             </div>
           </div>
         )

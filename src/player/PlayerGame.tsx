@@ -1,41 +1,72 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
 import {
   buildSchedule,
-  clamp,
   CARD_H,
   CARD_W,
+  clamp,
+  comboMult,
+  DASH_COOLDOWN_MS,
+  DASH_DISTANCE,
+  DASH_MS,
   GREEN_POINTS,
+  HEARTBROKEN_MS,
   HIT_DX,
+  MAX_STREAK_LEVEL,
+  MISS_PENALTY,
+  MOVE_SPEED,
   PLAYER_H,
   PLAYER_W,
   PLAYER_Y,
   RED_PENALTY,
-  ROUND_MS,
+  roundConfig,
   SABOTAGE_MS,
+  SOULMATE_POINTS,
   SPAWN_Y,
+  START_HEARTS,
+  TICK_MS,
 } from '../lib/game'
 import type {
   AvatarConfig,
   CatchMsg,
   GameState,
+  GrantEvent,
   MissMsg,
-  Mood,
+  Pose,
   PowerId,
   SabotageEvent,
   ScheduledCard,
   Tick,
 } from '../lib/types'
 
-const MOVE_SPEED = 1.2 / 1000 // field widths per ms
-// ~7 updates per second: smooth enough with the admin's interpolation and keeps
-// 7 players well under the Supabase free plan limit (100 messages/second).
-const TICK_MS = 140
+/** Things the game reports to the page (sounds, toasts). */
+export type GameFeedback =
+  | { type: 'green'; streak: number }
+  | { type: 'red'; broke: boolean }
+  | { type: 'miss' }
+  | { type: 'soulmate' }
+  | { type: 'ick' }
+  | { type: 'power'; power: PowerId }
+  | { type: 'shield-used'; from: string }
+  | { type: 'sabotaged'; from: string; power: PowerId }
+  | { type: 'heartbroken-over' }
+  | { type: 'dash' }
+  | { type: 'countdown'; n: number }
+  | { type: 'last10' }
+  | { type: 'end' }
 
 interface ActiveCard {
   card: ScheduledCard
   y: number
+  revealed: boolean
+}
+
+interface Burst {
+  id: number
+  x: number
+  at: number
+  kind: 'green' | 'red' | 'gold' | 'ick' | 'power'
 }
 
 interface Popup {
@@ -51,17 +82,21 @@ interface Props {
   avatar: AvatarConfig
   state: GameState
   sabotage: SabotageEvent | null
+  grant: GrantEvent | null
   tilt: boolean
-  out: boolean
   onTick: (t: Tick) => void
   onCatch: (m: CatchMsg) => void
   onMiss: (m: MissMsg) => void
   onPower: (power: PowerId) => void
+  onFeedback: (f: GameFeedback) => void
 }
 
-export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onTick, onCatch, onMiss, onPower }: Props) {
-  const schedule = useMemo(() => buildSchedule(state.seed), [state.seed])
+const fmtPts = (n: number) => (n > 0 ? `+${Math.round(n)}` : `${Math.round(n)}`)
+
+export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, onTick, onCatch, onMiss, onPower, onFeedback }: Props) {
   const round = state.round
+  const cfg = roundConfig(round)
+  const schedule = useMemo(() => buildSchedule(state.seed, round, state.gameSeed), [state.seed, round, state.gameSeed])
 
   // --- clock (game time, follows the admin) ---
   const clock = useRef({ base: state.elapsed, at: performance.now(), running: state.running, seq: -1 })
@@ -84,47 +119,99 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
   // --- simulation state ---
   const sim = useRef({
     x: 0.5,
+    facing: 1 as -1 | 1,
+    moving: false,
     next: 0,
     active: [] as ActiveCard[],
     score: state.roundScores[me] ?? 0,
+    // a player who reloads while heartbroken comes back with 1 heart
+    hearts: Math.max(1, state.hearts[me] ?? START_HEARTS),
+    streak: 0,
+    hbUntil: 0, // game time
+    streakBeforeBreak: 0,
+    shield: false,
     effects: [] as { power: PowerId; until: number }[],
-    mood: undefined as Mood,
-    moodUntil: 0,
+    reaction: '' as '' | 'cheer' | 'scared',
+    reactionUntil: 0,
+    dashUntil: 0,
+    dashDir: 0,
+    dashReadyAt: 0,
     lastGame: now(),
     lastReal: performance.now(),
     lastTick: 0,
-    popId: 0,
-    popups: [] as Popup[],
-    flash: '' as '' | 'green' | 'red',
-    flashUntil: 0,
     finalSent: false,
+    lastCountdown: 99,
+    last10: false,
+    uid: 0,
+    bursts: [] as Burst[],
+    popups: [] as Popup[],
+    shakeUntil: 0,
+    flash: '' as '' | 'green' | 'red' | 'gold',
+    flashUntil: 0,
   })
-  const input = useRef({ left: false, right: false, gamma: 0 })
-  const props = useRef({ onTick, onCatch, onMiss, onPower, out, tilt })
-  props.current = { onTick, onCatch, onMiss, onPower, out, tilt }
 
-  // apply sabotage aimed at me
+  const input = useRef({ left: false, right: false, gamma: 0, lastTap: { dir: 0, at: 0 }, swipe: null as null | { x: number; at: number } })
+  const props = useRef({ onTick, onCatch, onMiss, onPower, onFeedback, tilt })
+  props.current = { onTick, onCatch, onMiss, onPower, onFeedback, tilt }
+
+  const fb = (f: GameFeedback) => props.current.onFeedback(f)
+
+  // --- sabotage aimed at me ---
   const lastSabotage = useRef<string | null>(null)
   useEffect(() => {
     if (!sabotage || sabotage.to !== me || sabotage.round !== round) return
     if (lastSabotage.current === sabotage.key) return
     lastSabotage.current = sabotage.key
     const s = sim.current
+    if (s.shield) {
+      s.shield = false
+      fb({ type: 'shield-used', from: sabotage.from })
+      return
+    }
     const t = Math.max(0, now())
     s.effects = s.effects.filter((e) => e.power !== sabotage.power)
     s.effects.push({ power: sabotage.power, until: t + SABOTAGE_MS })
+    fb({ type: 'sabotaged', from: sabotage.from, power: sabotage.power })
     try {
       navigator.vibrate?.([80, 60, 80])
     } catch {
       /* ignore */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sabotage, me, round])
 
-  // keyboard (handy for testing on a laptop)
+  // --- heart given back by the admin (won a defense) ---
+  const lastGrant = useRef<string | null>(null)
+  useEffect(() => {
+    if (!grant || grant.to !== me || lastGrant.current === grant.key) return
+    lastGrant.current = grant.key
+    const s = sim.current
+    if (s.hbUntil > 0) {
+      s.hbUntil = 0
+      s.hearts = grant.hearts
+      s.streak = s.streakBeforeBreak
+    } else {
+      s.hearts = Math.min(START_HEARTS, s.hearts + grant.hearts)
+    }
+  }, [grant, me])
+
+  // --- dash ---
+  const dash = (dir: number) => {
+    const s = sim.current
+    const real = performance.now()
+    if (real < s.dashReadyAt || dir === 0 || s.hbUntil > 0) return
+    s.dashUntil = real + DASH_MS
+    s.dashDir = dir
+    s.dashReadyAt = real + DASH_COOLDOWN_MS
+    fb({ type: 'dash' })
+  }
+
+  // keyboard (handy for testing on a laptop; shift or space = dash)
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft' || e.key === 'a') input.current.left = true
       if (e.key === 'ArrowRight' || e.key === 'd') input.current.right = true
+      if (e.key === 'Shift' || e.key === ' ') dash(sim.current.facing)
     }
     const up = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft' || e.key === 'a') input.current.left = false
@@ -136,6 +223,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // tilt
@@ -166,16 +254,42 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
       const realNow = performance.now()
       const realDt = Math.min(64, realNow - s.lastReal)
       s.lastReal = realNow
-      const game = Math.min(now(), ROUND_MS)
+      const game = Math.min(now(), cfg.durationMs)
       const dt = clamp(game - s.lastGame, 0, 100)
       s.lastGame = game
 
+      // countdown beeps / last 10 s / end
+      if (game < 0) {
+        const n = Math.ceil(-game / 1000)
+        if (n !== s.lastCountdown) {
+          s.lastCountdown = n
+          fb({ type: 'countdown', n })
+        }
+      } else if (s.lastCountdown !== 0 && s.lastCountdown !== 99) {
+        s.lastCountdown = 0
+        fb({ type: 'countdown', n: 0 })
+      }
+      if (!s.last10 && game >= cfg.durationMs - 10_000 && game < cfg.durationMs && clock.current.running) {
+        s.last10 = true
+        fb({ type: 'last10' })
+      }
+
       s.effects = s.effects.filter((e) => e.until > game)
       const has = (id: PowerId) => s.effects.some((e) => e.power === id)
-      const playing = clock.current.running && game >= 0 && game < ROUND_MS
+      const playing = clock.current.running && game >= 0 && game < cfg.durationMs
+
+      // heartbroken ends -> back with 1 heart and half the combo
+      if (s.hbUntil > 0 && game >= s.hbUntil) {
+        s.hbUntil = 0
+        s.hearts = 1
+        s.streak = Math.floor(s.streakBeforeBreak / 2)
+        fb({ type: 'heartbroken-over' })
+      }
+      const broken = s.hbUntil > 0
 
       // movement
-      if (playing && !p.out && !has('exback')) {
+      s.moving = false
+      if (playing && !has('exback')) {
         let dir = (input.current.right ? 1 : 0) - (input.current.left ? 1 : 0)
         let speed = MOVE_SPEED
         if (p.tilt && dir === 0) {
@@ -184,6 +298,14 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
           speed = MOVE_SPEED * 1.1
         }
         if (has('gaslighting')) dir = -dir
+        if (realNow < s.dashUntil) {
+          dir = has('gaslighting') ? -s.dashDir : s.dashDir
+          speed = DASH_DISTANCE / DASH_MS
+        }
+        if (dir !== 0) {
+          s.facing = dir > 0 ? 1 : -1
+          s.moving = true
+        }
         s.x = clamp(s.x + dir * speed * realDt, PLAYER_W / 2, 1 - PLAYER_W / 2)
       }
 
@@ -191,70 +313,112 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
       while (s.next < schedule.length && schedule[s.next].t <= game) {
         const card = schedule[s.next]
         const y = SPAWN_Y + (game - card.t) * card.speed
-        if (y < 0.9) s.active.push({ card, y })
+        if (y < 0.8) s.active.push({ card, y, revealed: !card.grey })
         s.next++
       }
 
       // fall + collisions
-      const mult = has('mixedsignals') ? 1.9 : 1
+      const mult = has('mixedsignals') ? 1.8 : 1
+      const pm = cfg.pointsMult
       const keep: ActiveCard[] = []
       for (const a of s.active) {
         a.y += dt * a.card.speed * mult
         const bottom = a.y + CARD_H / 2
         const top = a.y - CARD_H / 2
+        if (!a.revealed && a.y >= PLAYER_Y - PLAYER_H / 2) a.revealed = true
         const hit =
-          playing &&
-          !p.out &&
-          bottom >= PLAYER_Y - PLAYER_H / 2 &&
-          top <= PLAYER_Y &&
-          Math.abs(a.card.x - s.x) < HIT_DX
+          playing && !broken && bottom >= PLAYER_Y - PLAYER_H / 2 && top <= PLAYER_Y && Math.abs(a.card.x - s.x) < HIT_DX
         if (hit) {
           const c = a.card
-          const pop: Popup = { id: s.popId++, x: c.x, text: '', cls: '', at: realNow }
+          const pop: Popup = { id: s.uid++, x: c.x, text: '', cls: '', at: realNow }
+          const burst: Burst = { id: s.uid++, x: s.x, at: realNow, kind: 'green' }
+          let broke = false
           if (c.kind === 'green') {
-            s.score += GREEN_POINTS
-            s.mood = 'happy'
-            s.moodUntil = realNow + 800
+            const pts = GREEN_POINTS * comboMult(s.streak) * pm
+            s.score += pts
+            s.streak++
+            s.reaction = 'cheer'
+            s.reactionUntil = realNow + 700
             s.flash = 'green'
-            pop.text = `+${GREEN_POINTS}`
+            pop.text = fmtPts(pts)
             pop.cls = 'pop-green'
+            fb({ type: 'green', streak: s.streak })
           } else if (c.kind === 'red') {
-            s.score -= RED_PENALTY
-            s.mood = 'horror'
-            s.moodUntil = realNow + 1100
+            s.score -= RED_PENALTY * pm
+            s.hearts = Math.max(0, s.hearts - 1)
+            s.streakBeforeBreak = s.streak
+            s.streak = 0
+            s.reaction = 'scared'
+            s.reactionUntil = realNow + 1100
             s.flash = 'red'
-            pop.text = `-${RED_PENALTY}`
+            s.shakeUntil = realNow + 350
+            burst.kind = 'red'
+            pop.text = fmtPts(-RED_PENALTY * pm)
             pop.cls = 'pop-red'
+            if (s.hearts <= 0) {
+              broke = true
+              s.hbUntil = Math.max(game, 0) + HEARTBROKEN_MS
+            }
+            fb({ type: 'red', broke })
             try {
               navigator.vibrate?.(150)
             } catch {
               /* ignore */
             }
+          } else if (c.kind === 'soulmate') {
+            s.score += SOULMATE_POINTS * pm
+            s.hearts = Math.min(START_HEARTS, s.hearts + 1)
+            s.reaction = 'cheer'
+            s.reactionUntil = realNow + 1200
+            s.flash = 'gold'
+            burst.kind = 'gold'
+            pop.text = `${fmtPts(SOULMATE_POINTS * pm)} ♥`
+            pop.cls = 'pop-gold'
+            fb({ type: 'soulmate' })
+          } else if (c.kind === 'ick') {
+            s.reaction = 'scared'
+            s.reactionUntil = realNow + 700
+            burst.kind = 'ick'
+            pop.text = '🤢 ICK'
+            pop.cls = 'pop-ick'
+            fb({ type: 'ick' })
           } else {
-            s.mood = 'happy'
-            s.moodUntil = realNow + 600
-            pop.text = `${POWERS[c.power!].emoji} POWER!`
+            const power = c.power!
+            s.reaction = 'cheer'
+            s.reactionUntil = realNow + 600
+            burst.kind = 'power'
+            pop.text = `${POWERS[power].emoji} ${POWERS[power].name}!`
             pop.cls = 'pop-power'
-            p.onPower(c.power!)
+            if (power === 'therapy') s.shield = true
+            else p.onPower(power)
+            fb({ type: 'power', power })
           }
           s.flashUntil = realNow + 260
           s.popups.push(pop)
-          p.onCatch({ id: me, round, kind: c.kind, cardId: c.id, text: c.text })
+          s.bursts.push(burst)
+          p.onCatch({ id: me, round, kind: c.kind, cardId: c.id, text: c.text, power: c.power, streak: s.streak, broke })
           continue
         }
         if (top > 1.02) {
-          if (a.card.kind === 'green' && a.card.text && !p.out) p.onMiss({ id: me, round, text: a.card.text })
+          if (a.card.kind === 'green' && a.card.text && clock.current.running && !broken) {
+            s.score -= MISS_PENALTY * pm
+            s.popups.push({ id: s.uid++, x: a.card.x, text: fmtPts(-MISS_PENALTY * pm), cls: 'pop-miss', at: realNow })
+            p.onMiss({ id: me, round, text: a.card.text })
+            fb({ type: 'miss' })
+          }
           continue
         }
         keep.push(a)
       }
       s.active = keep
-      if (s.moodUntil < realNow) s.mood = undefined
+      if (s.reactionUntil < realNow) s.reaction = ''
       s.popups = s.popups.filter((pp) => realNow - pp.at < 900)
+      s.bursts = s.bursts.filter((b) => realNow - b.at < 900)
 
-      // send state to admin
+      // send state to admin (~7/s while playing, 1/s otherwise)
+      const finished = game >= cfg.durationMs
+      if (finished && !s.finalSent) fb({ type: 'end' })
       const interval = playing ? TICK_MS : 1000
-      const finished = game >= ROUND_MS
       if (realNow - s.lastTick >= interval || (finished && !s.finalSent)) {
         if (finished) s.finalSent = true
         s.lastTick = realNow
@@ -262,16 +426,21 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
           id: me,
           round,
           x: Math.round(s.x * 1000) / 1000,
+          f: s.facing,
+          pose: poseOf(s, broken),
           cards: s.active.map((a) => ({
             id: a.card.id,
             x: Math.round(a.card.x * 1000) / 1000,
             y: Math.round(a.y * 1000) / 1000,
-            k: a.card.kind === 'green' ? 'g' : a.card.kind === 'red' ? 'r' : 'p',
+            k: KIND_CODE[a.card.kind],
+            ...(a.revealed ? {} : { h: 1 as const }),
           })),
-          score: s.score,
+          score: Math.round(s.score),
+          hearts: broken ? 0 : s.hearts,
+          streak: s.streak,
+          ...(broken ? { hb: 1 as const } : {}),
+          ...(s.shield ? { shield: 1 as const } : {}),
           fx: s.effects.map((e) => e.power),
-          mood: s.mood,
-          out: p.out || undefined,
         })
       }
       setFrame((f) => (f + 1) % 1e6)
@@ -281,45 +450,84 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schedule, me, round])
 
+  // ---------- render ----------
   const s = sim.current
   const game = now()
-  const has = (id: PowerId) => s.effects.some((e) => e.power === id)
-  const fx = s.effects.length ? s.effects[s.effects.length - 1].power : undefined
-  const countdown = game < 0 ? Math.ceil(-game / 1000) : 0
-  const timeLeft = Math.max(0, Math.ceil((ROUND_MS - Math.max(0, game)) / 1000))
   const realNow = performance.now()
+  const has = (id: PowerId) => s.effects.some((e) => e.power === id)
+  const broken = s.hbUntil > 0
+  const fx: PowerId | undefined = s.effects.length ? s.effects[s.effects.length - 1].power : s.shield ? 'therapy' : undefined
+  const countdown = game < 0 ? Math.ceil(-game / 1000) : 0
+  const timeLeft = Math.max(0, Math.ceil((cfg.durationMs - Math.max(0, game)) / 1000))
+  const mult = comboMult(s.streak)
+  const dashReady = realNow >= s.dashReadyAt
 
-  const hold = (key: 'left' | 'right', v: boolean) => (e: React.PointerEvent) => {
+  const press = (key: 'left' | 'right', v: boolean) => (e: RPointerEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     input.current[key] = v
+    if (v) {
+      const dir = key === 'left' ? -1 : 1
+      const t = input.current.lastTap
+      const at = performance.now()
+      if (t.dir === dir && at - t.at < 280) dash(dir)
+      input.current.lastTap = { dir, at }
+    }
+  }
+  const swipeStart = (e: RPointerEvent) => {
+    input.current.swipe = { x: e.clientX, at: performance.now() }
+  }
+  const swipeEnd = (e: RPointerEvent) => {
+    const sw = input.current.swipe
+    input.current.swipe = null
+    if (!sw) return
+    const dx = e.clientX - sw.x
+    if (Math.abs(dx) > 40 && performance.now() - sw.at < 300) dash(dx > 0 ? 1 : -1)
   }
 
   return (
-    <div className={`pgame ${s.effects.map((e) => `scr-${e.power}`).join(' ')}`}>
+    <div className={`pgame ${s.effects.map((e) => `scr-${e.power}`).join(' ')} ${s.shakeUntil > realNow ? 'shake' : ''}`}>
       <div className="hud">
         <div className="hud-score">
           <span className="hud-label">Score</span>
-          <strong>{(state.totals[me] ?? 0) + s.score}</strong>
+          <strong>{Math.round((state.totals[me] ?? 0) + s.score)}</strong>
         </div>
-        <div className={`hud-time ${timeLeft <= 10 && game > 0 ? 'urgent' : ''}`}>{timeLeft}s</div>
-        <div className="hud-lives" aria-label={`${state.lives[me] ?? 3} lives`}>
-          {[0, 1, 2].map((i) => (
-            <span key={i} className={i < (state.lives[me] ?? 3) ? 'heart on' : 'heart'}>
-              ◆
-            </span>
-          ))}
+        <div className="hud-mid">
+          <div className={`hud-time ${timeLeft <= 10 && game > 0 ? 'urgent' : ''}`}>{timeLeft}s</div>
+          <div className="hud-round">
+            R{round} · {cfg.name}
+            {cfg.pointsMult > 1 ? ' · x2' : ''}
+          </div>
+        </div>
+        <div className="hud-right">
+          <div className="hud-lives" aria-label={`${s.hearts} hearts`}>
+            {Array.from({ length: START_HEARTS }, (_, i) => (
+              <span key={i} className={i < (broken ? 0 : s.hearts) ? 'heart on' : 'heart'}>
+                ♥
+              </span>
+            ))}
+          </div>
+          <div className={`combo-badge lvl-${Math.min(s.streak, MAX_STREAK_LEVEL)}`} key={mult}>
+            x{mult} combo
+          </div>
         </div>
       </div>
 
-      <div className={`field ${s.flashUntil > realNow ? `flash-${s.flash}` : ''}`}>
+      <div
+        className={`field ${s.flashUntil > realNow ? `flash-${s.flash}` : ''}`}
+        onPointerDown={swipeStart}
+        onPointerUp={swipeEnd}
+        onPointerCancel={() => (input.current.swipe = null)}
+      >
         {s.active.map((a) => {
           const c = a.card
-          const looksGreen = c.kind === 'green' || (c.kind === 'red' && has('lovebombing'))
-          const cls = c.kind === 'power' ? 'fcard power' : looksGreen ? 'fcard green' : 'fcard red'
+          let look: string = c.kind
+          if (!a.revealed) look = 'grey'
+          if (has('lovebombing') && (c.kind === 'red' || c.kind === 'green')) look = 'green'
           return (
             <div
               key={c.id}
-              className={`${cls} ${has('ghosting') ? 'ghost' : ''}`}
+              className={`fcard ${look} ${has('ghosting') ? 'ghost' : ''}`}
               style={{
                 left: `${c.x * 100}%`,
                 top: `${a.y * 100}%`,
@@ -334,7 +542,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
                 </>
               ) : (
                 <>
-                  <span className="flag-icon">{looksGreen ? '🟩' : '🟥'}</span>
+                  <span className="fcard-tag">{TAG[look] ?? ''}</span>
                   <span className="fcard-text">{c.text}</span>
                 </>
               )}
@@ -342,21 +550,26 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
           )
         })}
 
+        <div className="player-line" style={{ top: `${(PLAYER_Y - PLAYER_H / 2) * 100}%` }} />
+
+        {s.bursts.map((b) => (
+          <div key={b.id} className={`burst burst-${b.kind}`} style={{ left: `${b.x * 100}%`, top: `${PLAYER_Y * 100 - 4}%` }}>
+            {Array.from({ length: 8 }, (_, i) => (
+              <i key={i} style={{ ['--a' as string]: `${i * 45 + 10}deg` }}>
+                {BURST_CHAR[b.kind]}
+              </i>
+            ))}
+          </div>
+        ))}
+
         {s.popups.map((pp) => (
-          <div key={pp.id} className={`popup ${pp.cls}`} style={{ left: `${pp.x * 100}%`, top: `${(PLAYER_Y - 0.14) * 100}%` }}>
+          <div key={pp.id} className={`popup ${pp.cls}`} style={{ left: `${pp.x * 100}%`, top: `${(PLAYER_Y - 0.17) * 100}%` }}>
             {pp.text}
           </div>
         ))}
 
-        <div
-          className="pchar"
-          style={{
-            left: `${s.x * 100}%`,
-            top: `${PLAYER_Y * 100}%`,
-            width: `${PLAYER_W * 100}%`,
-          }}
-        >
-          <Avatar config={avatar} pose={s.mood === 'happy' ? 'cheer' : s.mood === 'horror' ? 'scared' : 'idle'} effect={fx} size={100} dim={out} />
+        <div className="pchar" style={{ left: `${s.x * 100}%`, top: `${PLAYER_Y * 100}%`, width: `${PLAYER_W * 100}%` }}>
+          <Avatar config={avatar} pose={poseOf(s, broken)} facing={s.facing} effect={fx} size={100} />
         </div>
 
         {s.effects.length > 0 && (
@@ -364,36 +577,45 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
             {POWERS[s.effects[s.effects.length - 1].power].emoji} {POWERS[s.effects[s.effects.length - 1].power].hint}
           </div>
         )}
+        {s.shield && !s.effects.length && <div className="shield-badge">🛡️ Therapy shield ON</div>}
 
         {countdown > 0 && (
           <div className="countdown" key={countdown}>
             {countdown}
+            <small>{cfg.tagline}</small>
           </div>
         )}
-        {!state.running && game >= 0 && game < ROUND_MS && state.phase === 'playing' && (
+        {!state.running && game >= 0 && game < cfg.durationMs && state.phase === 'playing' && (
           <div className="paused-badge">Paused</div>
         )}
-        {out && <div className="out-badge">Heartbroken 💔 You&apos;re out of lives — keep voting!</div>}
+        {broken && (
+          <div className="broken-badge">
+            💔 Heartbroken! Back in {Math.max(1, Math.ceil((s.hbUntil - game) / 1000))}s
+          </div>
+        )}
       </div>
 
       <div className="controls">
         <button
           className="ctrl-btn"
-          onPointerDown={hold('left', true)}
-          onPointerUp={hold('left', false)}
-          onPointerLeave={hold('left', false)}
-          onPointerCancel={hold('left', false)}
+          onPointerDown={press('left', true)}
+          onPointerUp={press('left', false)}
+          onPointerLeave={press('left', false)}
+          onPointerCancel={press('left', false)}
           onContextMenu={(e) => e.preventDefault()}
           aria-label="Move left"
         >
           ◀
         </button>
+        <div className={`dash-dot ${dashReady ? 'ready' : ''}`} title="Double tap to dash">
+          ⚡
+        </div>
         <button
           className="ctrl-btn"
-          onPointerDown={hold('right', true)}
-          onPointerUp={hold('right', false)}
-          onPointerLeave={hold('right', false)}
-          onPointerCancel={hold('right', false)}
+          onPointerDown={press('right', true)}
+          onPointerUp={press('right', false)}
+          onPointerLeave={press('right', false)}
+          onPointerCancel={press('right', false)}
           onContextMenu={(e) => e.preventDefault()}
           aria-label="Move right"
         >
@@ -402,4 +624,29 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
       </div>
     </div>
   )
+}
+
+const KIND_CODE = { green: 'g', red: 'r', power: 'p', ick: 'i', soulmate: 's' } as const
+
+const TAG: Record<string, string> = {
+  green: 'GREEN',
+  red: 'RED',
+  grey: '???',
+  ick: 'ICK',
+  soulmate: '★ SOULMATE',
+}
+
+const BURST_CHAR: Record<Burst['kind'], string> = {
+  green: '♥',
+  red: '💔',
+  gold: '★',
+  ick: '🤢',
+  power: '✦',
+}
+
+function poseOf(s: { reaction: string; moving: boolean }, broken: boolean): Pose {
+  if (broken) return 'cry'
+  if (s.reaction === 'cheer') return 'cheer'
+  if (s.reaction === 'scared') return 'scared'
+  return s.moving ? 'walk' : 'idle'
 }

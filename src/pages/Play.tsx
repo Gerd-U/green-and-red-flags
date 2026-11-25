@@ -2,15 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Avatar from '../components/Avatar'
 import PolyBackground from '../components/PolyBackground'
+import Tutorial from '../components/Tutorial'
 import { POWERS } from '../data/cards'
-import { randomAvatar, sanitizeAvatar } from '../lib/avatar'
 import { randomProfileLine, sanitizeProfileLine } from '../data/profiles'
+import { randomAvatar, sanitizeAvatar } from '../lib/avatar'
+import { roundConfig, TOTAL_ROUNDS } from '../lib/game'
 import { mainTopic, normalizeCode, openChannel, playerTopic, type Room } from '../lib/room'
 import { getPlayerId, load, save } from '../lib/storage'
 import type {
   AvatarConfig,
   CatchMsg,
   GameState,
+  GrantEvent,
   MissMsg,
   PlayerInfo,
   PowerId,
@@ -19,7 +22,7 @@ import type {
   Tick,
 } from '../lib/types'
 import Editor from '../player/Editor'
-import PlayerGame from '../player/PlayerGame'
+import PlayerGame, { type GameFeedback } from '../player/PlayerGame'
 
 interface Profile {
   name: string
@@ -56,6 +59,7 @@ export default function Play() {
   const urlRoom = normalizeCode(params.get('room'))
   const [room, setRoom] = useState(urlRoom || saved?.room || '')
   const [name, setName] = useState(saved?.name ?? '')
+  // sanitizeAvatar turns old (polygon) saves into a new random person
   const [avatar, setAvatar] = useState<AvatarConfig>(() => (saved?.avatar ? sanitizeAvatar(saved.avatar) : randomAvatar()))
   const [bio, setBio] = useState<string>(() => (saved?.bio ? sanitizeProfileLine(saved.bio) : randomProfileLine()))
   const [ready, setReady] = useState(Boolean(saved?.ready && saved.room === room && saved.avatar))
@@ -87,7 +91,9 @@ export default function Play() {
         <PolyBackground />
         <form className="panel join-panel" onSubmit={submitJoin}>
           <h1 className="title-sm">Join the game</h1>
-          <label className="label" htmlFor="room">Room code</label>
+          <label className="label" htmlFor="room">
+            Room code
+          </label>
           <input
             id="room"
             className="input code-input"
@@ -98,7 +104,9 @@ export default function Play() {
             autoCapitalize="characters"
             maxLength={4}
           />
-          <label className="label" htmlFor="name">Your name</label>
+          <label className="label" htmlFor="name">
+            Your name
+          </label>
           <input
             id="name"
             className="input"
@@ -118,7 +126,7 @@ export default function Play() {
 
   if (step === 'editor') {
     return (
-      <div className="screen play-screen scrollable">
+      <div className="screen play-screen">
         <PolyBackground variant="dark" />
         <Editor
           name={name}
@@ -172,12 +180,29 @@ interface RoomProps {
   onLeave: () => void
 }
 
+/** Milliseconds left of an admin countdown, ticking locally between state messages. */
+function useCountdown(ms: number | undefined, seq: number | undefined, paused = false) {
+  const [base, setBase] = useState({ ms: ms ?? 0, at: performance.now() })
+  const [, force] = useState(0)
+  useEffect(() => {
+    setBase({ ms: ms ?? 0, at: performance.now() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seq])
+  useEffect(() => {
+    const id = setInterval(() => force((n) => n + 1), 250)
+    return () => clearInterval(id)
+  }, [])
+  const left = paused ? base.ms : base.ms - (performance.now() - base.at)
+  return Math.max(0, left)
+}
+
 function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: RoomProps) {
   const [status, setStatus] = useState('connecting')
   const [state, setState] = useState<GameState | null>(null)
   const [players, setPlayers] = useState<PlayerInfo[]>([])
   const [adminOnline, setAdminOnline] = useState(false)
   const [sabotage, setSabotage] = useState<SabotageEvent | null>(null)
+  const [grant, setGrant] = useState<GrantEvent | null>(null)
   const [toast, setToast] = useState<{ text: string; color: string; key: number } | null>(null)
   const [pendingPowers, setPendingPowers] = useState<PowerId[]>([])
   const [tilt, setTilt] = useState(false)
@@ -195,7 +220,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
   )
 
   const showToast = useCallback((text: string, color: string) => {
-    setToast({ text, color, key: Date.now() })
+    setToast({ text, color, key: Date.now() + Math.random() })
   }, [])
 
   useEffect(() => {
@@ -216,12 +241,9 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
       lastSeq.current = s.seq
       setState(s)
     })
-    main.on<SabotageEvent>('sabotage', (ev) => {
-      setSabotage(ev)
-      if (ev.to === me) {
-        const p = POWERS[ev.power]
-        showToast(`${nameOf(ev.from)} used ${p.name.toUpperCase()} on you! ${p.emoji}`, p.color)
-      }
+    main.on<SabotageEvent>('sabotage', (ev) => setSabotage(ev))
+    main.on<GrantEvent>('grant', (ev) => {
+      if (ev.to === me) setGrant(ev)
     })
     main.on('reset', () => {
       lastSeq.current = -1
@@ -274,6 +296,24 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
   const sendMiss = useCallback((m: MissMsg) => mineRef.current?.send('miss', m), [])
   const gotPower = useCallback((p: PowerId) => setPendingPowers((list) => [...list, p]), [])
 
+  const onFeedback = useCallback(
+    (f: GameFeedback) => {
+      if (f.type === 'sabotaged') {
+        const p = POWERS[f.power]
+        showToast(`${nameOf(f.from)} used ${p.name.toUpperCase()} on you! ${p.emoji}`, p.color)
+      } else if (f.type === 'shield-used') {
+        showToast(`🛡️ Therapy blocked ${nameOf(f.from)}'s sabotage!`, '#0891b2')
+      } else if (f.type === 'power' && f.power === 'therapy') {
+        showToast('🛡️ Therapy! The next sabotage will bounce off.', '#0891b2')
+      } else if (f.type === 'red' && f.broke) {
+        showToast('💔 Heartbroken! Wait 10 seconds...', '#ff3b5c')
+      } else if (f.type === 'heartbroken-over') {
+        showToast('❤️ You are back! 1 heart left.', '#22c55e')
+      }
+    },
+    [nameOf, showToast]
+  )
+
   const sendPower = (to: string) => {
     const power = pendingPowers[0]
     if (!power) return
@@ -304,11 +344,12 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
   }
 
   const others = players.filter((p) => p.id !== me)
-  const lives = state?.lives[me] ?? 3
-  const out = Boolean(state && state.round > 0 && lives <= 0)
-  const inRound = state && (state.phase === 'playing' || state.phase === 'defense' || state.phase === 'roundEnd') && state.round > 0
+  const phase = state?.phase
+  const inRound = state && (phase === 'playing' || phase === 'defense' || phase === 'roundEnd') && state.round > 0
   const defense = state?.defense ?? null
-  const defenseKey = state && defense ? `${state.round}-${defense.context}-${defense.playerId}` : null
+  const autoLeft = useCountdown(state?.auto?.remaining, state?.seq, state?.auto?.paused)
+  const stageLeft = useCountdown(defense?.remaining, state?.seq)
+  const tutorialLeft = useCountdown(state?.tutorialLeft, state?.seq)
 
   // auto-pick a random target if the player does not choose in time
   useEffect(() => {
@@ -324,22 +365,23 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
 
   // drop pending powers when the round is not being played
   useEffect(() => {
-    if (state && state.phase !== 'playing' && state.phase !== 'defense') setPendingPowers([])
-  }, [state?.phase, state])
+    if (phase && phase !== 'playing' && phase !== 'defense') setPendingPowers([])
+  }, [phase])
 
   const vote = (v: 'convinced' | 'not') => {
-    if (!defenseKey) return
-    mineRef.current?.send('vote', { id: me, vote: v, defenseKey })
-    setVotedKey(defenseKey)
+    if (!defense) return
+    mineRef.current?.send('vote', { id: me, vote: v, defenseKey: defense.key })
+    setVotedKey(defense.key)
   }
 
-  const myTotal = state ? (state.totals[me] ?? 0) + (state.roundScores[me] ?? 0) : 0
+  const myTotal = state ? Math.round((state.totals[me] ?? 0) + (state.roundScores[me] ?? 0)) : 0
   const ranking = state
     ? Object.keys({ ...state.totals, ...state.roundScores })
         .map((id) => ({ id, score: (state.totals[id] ?? 0) + (state.roundScores[id] ?? 0) }))
         .sort((a, b) => b.score - a.score)
     : []
   const myPlace = ranking.findIndex((r) => r.id === me) + 1
+  const myAwards = state?.awards?.filter((a) => a.playerId === me) ?? []
 
   return (
     <div className="screen play-screen">
@@ -352,36 +394,45 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
           avatar={avatar}
           state={state}
           sabotage={sabotage}
+          grant={grant}
           tilt={tilt}
-          out={out}
           onTick={sendTick}
           onCatch={sendCatch}
           onMiss={sendMiss}
           onPower={gotPower}
+          onFeedback={onFeedback}
         />
+      ) : phase === 'tutorial' ? (
+        <Tutorial secondsLeft={Math.ceil(tutorialLeft / 1000)} compact />
       ) : (
         <div className="wait-view">
           <div className="wait-top">
             <span className="chip">Room {code}</span>
             <span className={`dot ${status === 'SUBSCRIBED' ? 'on' : ''}`} />
           </div>
-          {state?.phase === 'podium' ? (
+          {phase === 'podium' || phase === 'awards' ? (
             <div className="wait-center">
               <div className="big-place">#{myPlace || '-'}</div>
-              <Avatar config={avatar} size={150} pose={myPlace === 1 ? 'cheer' : 'idle'} />
+              <Avatar config={avatar} size={150} pose={myPlace === 1 ? 'dance' : myPlace <= 3 ? 'cheer' : 'idle'} />
               <h2 className="wait-title">{myPlace === 1 ? 'You won!' : 'Game over!'}</h2>
               <p className="muted">Final score: {myTotal}. Look at the big screen!</p>
+              {myAwards.map((a) => (
+                <div key={a.id} className="my-award">
+                  {a.emoji} {a.title}
+                </div>
+              ))}
             </div>
           ) : (
             <div className="wait-center">
-              <Avatar config={avatar} size={170} />
+              <Avatar config={avatar} size={170} pose="idle" />
               <h2 className="wait-title">{name}</h2>
+              <div className="wait-bio">“{bio}”</div>
               <p className="muted">
                 {status !== 'SUBSCRIBED'
                   ? 'Connecting...'
                   : !adminOnline
                     ? 'Waiting for the host to open the room...'
-                    : "You're in! Waiting for the host to start."}
+                    : "You're in! Look for your dating profile on the big screen."}
               </p>
               <div className="wait-actions">
                 <button className="btn btn-ghost" onClick={onEdit}>
@@ -396,14 +447,14 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
         </div>
       )}
 
-      {inRound && state?.phase === 'playing' && (
+      {inRound && phase === 'playing' && (
         <button className={`tilt-btn ${tilt ? 'on' : ''}`} onClick={enableTilt}>
           📱 Tilt {tilt ? 'ON' : 'OFF'}
         </button>
       )}
 
       {/* sabotage target picker */}
-      {pendingPowers.length > 0 && state?.phase === 'playing' && (
+      {pendingPowers.length > 0 && phase === 'playing' && (
         <div className="sheet power-sheet">
           <div className="sheet-title" style={{ color: POWERS[pendingPowers[0]].color }}>
             {POWERS[pendingPowers[0]].emoji} {POWERS[pendingPowers[0]].name}! Who gets it?
@@ -412,7 +463,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
             {others.length === 0 && <p className="muted">Nobody else is here...</p>}
             {others.map((p) => (
               <button key={p.id} className="target" onClick={() => sendPower(p.id)}>
-                <Avatar config={p.avatar} size={44} animate={false} />
+                <Avatar config={p.avatar} size={40} crop="head" animate={false} />
                 <span>{p.name}</span>
               </button>
             ))}
@@ -421,27 +472,41 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
       )}
 
       {/* defense overlay */}
-      {state?.phase === 'defense' && defense && (
+      {phase === 'defense' && defense && (
         <div className="overlay defense-phone">
           {defense.playerId === me ? (
             <div className="defense-me">
               <div className="chip red">Red flag!</div>
-              <Avatar config={avatar} size={120} pose={defense.stage === 'result' && defense.result === 'convinced' ? 'cheer' : 'scared'} />
+              <Avatar
+                config={avatar}
+                size={110}
+                pose={defense.stage === 'result' ? (defense.result === 'convinced' ? 'cheer' : 'cry') : 'scared'}
+              />
               <p className="quote">“{defense.text}”</p>
-              {defense.stage === 'talk' && <h2 className="shout">Defend yourself! Explain in English why it&apos;s not so bad.</h2>}
-              {defense.stage === 'vote' && <h2 className="shout">The others are voting...</h2>}
+              {defense.stage === 'talk' && (
+                <>
+                  <h2 className="shout">Defend yourself! {Math.ceil(stageLeft / 1000)}s</h2>
+                  <p className="starter">Start with: “{defense.starter}”</p>
+                </>
+              )}
+              {defense.stage === 'vote' && <h2 className="shout">The others are voting... {Math.ceil(stageLeft / 1000)}s</h2>}
               {defense.stage === 'result' && <DefenseResult defense={defense} mine />}
             </div>
           ) : (
             <div className="defense-other">
               <div className="chip red">{defense.name} caught a red flag</div>
               <p className="quote">“{defense.text}”</p>
-              {defense.stage === 'talk' && <h2 className="shout">Listen to {defense.name}&apos;s defense...</h2>}
+              {defense.stage === 'talk' && (
+                <h2 className="shout">
+                  Listen to {defense.name}&apos;s defense... {Math.ceil(stageLeft / 1000)}s
+                </h2>
+              )}
               {defense.stage === 'vote' &&
-                (votedKey === defenseKey ? (
+                (votedKey === defense.key ? (
                   <h2 className="shout">Vote sent! ✔</h2>
                 ) : (
                   <div className="vote-buttons">
+                    <div className="vote-timer">{Math.ceil(stageLeft / 1000)}s to vote</div>
                     <button className="btn btn-green btn-huge" onClick={() => vote('convinced')}>
                       👍 Convinced
                     </button>
@@ -453,16 +518,39 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: Roo
               {defense.stage === 'result' && <DefenseResult defense={defense} />}
             </div>
           )}
+          {state?.auto && (
+            <div className="auto-line">
+              {state.auto.paused ? '⏸ ' : ''}
+              {state.auto.label} in {Math.ceil(autoLeft / 1000)}s
+            </div>
+          )}
         </div>
       )}
 
       {/* round end */}
-      {state?.phase === 'roundEnd' && (
+      {phase === 'roundEnd' && state && (
         <div className="overlay round-end-phone">
-          <h2 className="wait-title">Round {state.round} over!</h2>
-          <Avatar config={avatar} size={120} />
+          <div className="chip">
+            Round {state.round} of {TOTAL_ROUNDS} · {roundConfig(state.round).name}
+          </div>
+          <Avatar config={avatar} size={110} pose={myPlace === 1 ? 'dance' : 'idle'} />
           <p className="big-score">{myTotal} pts</p>
-          <p className="muted">You are #{myPlace || '-'} · {lives} {lives === 1 ? 'life' : 'lives'} left</p>
+          <p className="muted">
+            You are #{myPlace || '-'} · {state.hearts[me] ?? 5} ♥
+          </p>
+          {state.summary?.topRed && (
+            <div className="phone-question">
+              <div className="label">Red flag of the round</div>
+              <p className="quote">“{state.summary.topRed.text}”</p>
+              <p className="q">{state.summary.question}</p>
+            </div>
+          )}
+          {state.auto && (
+            <div className="auto-line">
+              {state.auto.paused ? '⏸ ' : ''}
+              {state.auto.label} in {Math.ceil(autoLeft / 1000)}s
+            </div>
+          )}
         </div>
       )}
 
@@ -483,7 +571,15 @@ function DefenseResult({ defense, mine }: { defense: NonNullable<GameState['defe
       <p>
         👍 {defense.convinced ?? 0} · 👎 {defense.notConvinced ?? 0}
       </p>
-      <p className="muted">{ok ? (mine ? 'You keep your points.' : 'They keep their points.') : mine ? 'You lose a life 💔' : 'They lose a life 💔'}</p>
+      <p className="muted">
+        {ok
+          ? mine
+            ? 'You get your heart and points back.'
+            : 'They get their heart and points back.'
+          : mine
+            ? 'You lose 100 extra points 💸'
+            : 'They lose 100 extra points 💸'}
+      </p>
     </div>
   )
 }

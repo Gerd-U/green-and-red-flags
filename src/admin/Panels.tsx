@@ -1,30 +1,34 @@
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { DEFENSE_MS } from '../lib/game'
-import type { PlayerInfo, PodiumStats, SabotageEvent } from '../lib/types'
-import type { AdminGame } from './useAdminGame'
+import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, NEXT_ROUND_MS, roundConfig, TOTAL_ROUNDS } from '../lib/game'
+import type { Award, PlayerInfo, PodiumStats, RoundSummary, SabotageEvent } from '../lib/types'
+import type { AdminGame, Announcement } from './useAdminGame'
 
 export interface RankRow {
   player: PlayerInfo
   score: number
-  lives: number
+  hearts: number
+  streak: number
 }
 
 export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: boolean }) {
-  const ROW_H = compact ? 64 : 84
+  const ROW_H = compact ? 60 : 78
   return (
     <div className={`ranking ${compact ? 'compact' : ''}`} style={{ height: rows.length * ROW_H }}>
       {rows.map((r, i) => (
         <div
           key={r.player.id}
-          className={`rank-row ${i === 0 ? 'first' : ''} ${r.lives <= 0 ? 'out' : ''}`}
+          className={`rank-row ${i === 0 ? 'first' : ''}`}
           style={{ transform: `translateY(${i * ROW_H}px)`, height: ROW_H - 8, ['--pc' as string]: r.player.avatar.topColor }}
         >
           <span className="rank-pos">{i + 1}</span>
-          <Avatar config={r.player.avatar} size={compact ? 38 : 50} animate={false} dim={r.lives <= 0} />
-          <span className="rank-name">{r.player.name}</span>
-          <span className="rank-lives">{'◆'.repeat(Math.max(0, r.lives))}</span>
-          <span className="rank-score">{r.score}</span>
+          <Avatar config={r.player.avatar} size={compact ? 34 : 44} crop="head" animate={false} />
+          <span className="rank-name">
+            {r.player.name}
+            <span className="rank-hearts">{'♥'.repeat(Math.max(0, r.hearts))}</span>
+          </span>
+          {r.streak >= 2 && <span className="rank-combo">🔥{r.streak}</span>}
+          <span className="rank-score">{Math.round(r.score)}</span>
         </div>
       ))}
     </div>
@@ -44,9 +48,7 @@ export function Lobby({ players, code, joinUrl }: { players: PlayerInfo[]; code:
           ))}
         </div>
         <p className="lobby-hint">
-          {players.length === 0
-            ? 'Waiting for players...'
-            : `${players.filter((p) => p.ready).length} of ${players.length} ready`}
+          {players.length === 0 ? 'Waiting for players...' : `${players.filter((p) => p.ready).length} of ${players.length} ready`}
         </p>
       </div>
       <div className="lobby-players">
@@ -65,7 +67,7 @@ export function Lobby({ players, code, joinUrl }: { players: PlayerInfo[]; code:
         ))}
         {players.length === 0 && (
           <div className="lobby-empty">
-            Scan the URL, type the code, build your character and press <b>Ready</b>.
+            Open the link, type the code, build your character, pick your dating profile line and press <b>Ready</b>.
           </div>
         )}
       </div>
@@ -73,54 +75,30 @@ export function Lobby({ players, code, joinUrl }: { players: PlayerInfo[]; code:
   )
 }
 
-export function DefenseView({
-  game,
-  player,
-  onSkip,
-  onCloseVote,
-  onContinue,
-}: {
-  game: AdminGame
-  player: PlayerInfo | undefined
-  onSkip: () => void
-  onCloseVote: () => void
-  onContinue: () => void
-}) {
+export function DefenseView({ game, player, autoLeft }: { game: AdminGame; player: PlayerInfo | undefined; autoLeft: number }) {
   const d = game.defense
   if (!d) return null
-  const left = Math.max(0, Math.ceil((d.talkEndsAt - performance.now()) / 1000))
-  const pct = Math.max(0, Math.min(1, (d.talkEndsAt - performance.now()) / DEFENSE_MS))
+  const left = Math.max(0, d.stageEndsAt - performance.now())
+  const total = d.stage === 'talk' ? DEFENSE_TALK_MS : DEFENSE_VOTE_MS
   const ok = d.result === 'convinced'
   return (
     <div className="overlay defense-big">
       <div className="defense-grid">
         <div className="defense-avatar">
-          <Avatar
-            config={player?.avatar}
-            size={300}
-            pose={d.stage === 'result' ? (ok ? 'cheer' : 'scared') : 'scared'}
-          />
+          <Avatar config={player?.avatar} size={300} pose={d.stage === 'result' ? (ok ? 'cheer' : 'cry') : 'scared'} />
         </div>
         <div className="defense-info">
-          <div className="chip red big">
-            {d.context === 'first' ? 'First red flag of the round!' : 'Random red flag from this round'}
-          </div>
+          <div className="chip red big">Red flag! Round {game.round}</div>
           <h1 className="defense-name">{d.name}</h1>
           <div className="defense-card">
-            <span className="flag-icon">🟥</span> {d.text}
+            <span className="fcard-mini red">RED</span> {d.text}
           </div>
           {d.stage === 'talk' && (
             <>
               <h2 className="defend-shout">Defend yourself!</h2>
-              <div className="timer">
-                <div className="timer-num">{left}</div>
-                <div className="timer-bar">
-                  <div style={{ width: `${pct * 100}%` }} />
-                </div>
+              <div className="starter-big">
+                Try: <b>“{d.starter}”</b>
               </div>
-              <button className="btn btn-ghost" onClick={onSkip}>
-                Skip to vote ⏭
-              </button>
             </>
           )}
           {d.stage === 'vote' && (
@@ -129,20 +107,24 @@ export function DefenseView({
               <p className="vote-count">
                 {Object.keys(d.votes).length} / {d.votesNeeded} votes
               </p>
-              <button className="btn btn-ghost" onClick={onCloseVote}>
-                Close vote
-              </button>
             </>
+          )}
+          {d.stage !== 'result' && (
+            <div className="timer">
+              <div className="timer-num">{Math.ceil(left / 1000)}</div>
+              <div className="timer-bar">
+                <div style={{ width: `${(left / total) * 100}%` }} />
+              </div>
+            </div>
           )}
           {d.stage === 'result' && (
             <>
               <h2 className={`defend-shout ${ok ? 'ok' : 'bad'}`}>{ok ? 'Convinced! 👍' : 'Not convinced! 👎'}</h2>
               <p className="vote-count">
-                👍 {d.convinced} · 👎 {d.notConvinced} — {ok ? `${d.name} keeps the points` : `${d.name} loses a life 💔`}
+                👍 {d.convinced} · 👎 {d.notConvinced} —{' '}
+                {ok ? `${d.name} gets the heart and points back` : `${d.name} loses 100 extra points`}
               </p>
-              <button className="btn btn-green btn-big" onClick={onContinue}>
-                {d.context === 'first' ? 'Continue the round ▶' : 'Show results ▶'}
-              </button>
+              <p className="auto-big">Back to the game in {Math.ceil(autoLeft / 1000)}…</p>
             </>
           )}
         </div>
@@ -159,15 +141,92 @@ export function SabotageAnim({ ev, players }: { ev: SabotageEvent; players: Reco
     <div className="sabotage-anim" key={ev.key} style={{ ['--pw' as string]: p.color }}>
       <div className="sab-row">
         <div className="sab-from">
-          <Avatar config={from?.avatar} size={130} pose="cheer" />
+          <Avatar config={from?.avatar} size={120} pose="cheer" />
         </div>
         <div className="sab-bolt">{p.emoji}</div>
         <div className="sab-to">
-          <Avatar config={to?.avatar} size={130} pose="scared" effect={ev.power} />
+          <Avatar config={to?.avatar} size={120} pose="scared" effect={ev.power} />
         </div>
       </div>
       <div className="sab-text">
         <b>{from?.name ?? '???'}</b> used <span className="sab-power">{p.name.toUpperCase()}</span> on <b>{to?.name ?? '???'}</b>!
+      </div>
+    </div>
+  )
+}
+
+export function Announcer({ items }: { items: Announcement[] }) {
+  const a = items[0]
+  if (!a) return null
+  return (
+    <div className="announcer" key={a.key} style={{ ['--ac' as string]: a.color }}>
+      <div className="ann-text">{a.text}</div>
+      {a.sub && <div className="ann-sub">{a.sub}</div>}
+    </div>
+  )
+}
+
+export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame; rows: RankRow[]; autoLeft: number; paused: boolean }) {
+  const sum: RoundSummary | undefined = game.summary
+  const cfg = roundConfig(game.round)
+  const discussing = autoLeft > NEXT_ROUND_MS
+  const last = game.round >= TOTAL_ROUNDS
+  return (
+    <div className="round-end">
+      <div className="re-left">
+        <h1 className="round-end-title">
+          Round {game.round}: {cfg.name}
+        </h1>
+        <Ranking rows={rows} compact={rows.length > 6} />
+      </div>
+      <div className="re-right">
+        <div className="label light">Red flag of the round</div>
+        <div className="re-card">{sum?.topRed ? `“${sum.topRed.text}”` : 'Nobody caught a red flag! 😇'}</div>
+        {sum?.topRed && (
+          <div className="re-sub">
+            caught by {sum.topRed.count} {sum.topRed.count === 1 ? 'person' : 'people'}
+          </div>
+        )}
+        <div className="re-question">{sum?.question}</div>
+        <div className={`re-timer ${discussing ? '' : 'next'}`}>
+          {paused ? '⏸ ' : ''}
+          {discussing
+            ? `Discuss: ${formatClock(autoLeft - NEXT_ROUND_MS)}`
+            : `${last ? 'Awards' : `Round ${game.round + 1}`} in ${Math.ceil(autoLeft / 1000)}`}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function AwardsShow({ awards, players, shownMs }: { awards: Award[]; players: Record<string, PlayerInfo>; shownMs: number }) {
+  if (!awards.length) {
+    return (
+      <div className="awards-wrap">
+        <h1 className="podium-title">No awards this time!</h1>
+      </div>
+    )
+  }
+  const idx = Math.min(awards.length - 1, Math.floor(shownMs / AWARD_SHOW_MS))
+  const a = awards[idx]
+  const p = players[a.playerId]
+  return (
+    <div className="awards-wrap">
+      <div className="awards-dots">
+        {awards.map((aw, i) => (
+          <span key={aw.id} className={i <= idx ? 'on' : ''}>
+            {aw.emoji}
+          </span>
+        ))}
+      </div>
+      <div className="award" key={a.id}>
+        <div className="award-emoji">{a.emoji}</div>
+        <div className="award-title">{a.title}</div>
+        <div className="award-avatar">
+          <Avatar config={p?.avatar} size={220} pose={a.id === 'victim' || a.id === 'toxic' ? 'cry' : 'dance'} />
+        </div>
+        <div className="award-name">{p?.name ?? '???'}</div>
+        <div className="award-desc">{a.desc}</div>
       </div>
     </div>
   )
@@ -187,10 +246,10 @@ export function Podium({ rows, stats }: { rows: RankRow[]; stats?: PodiumStats }
             <div key={r.player.id} className={`podium-col place-${places[i]}`}>
               <div className={places[i] === 1 ? 'winner-avatar' : 'podium-avatar'}>
                 {places[i] === 1 && <div className="confetti" aria-hidden="true" />}
-                <Avatar config={r.player.avatar} size={places[i] === 1 ? 200 : 150} pose={places[i] === 1 ? 'cheer' : 'idle'} />
+                <Avatar config={r.player.avatar} size={places[i] === 1 ? 200 : 150} pose={places[i] === 1 ? 'dance' : 'cheer'} />
               </div>
               <div className="podium-name">{r.player.name}</div>
-              <div className="podium-score">{r.score} pts</div>
+              <div className="podium-score">{Math.round(r.score)} pts</div>
               <div className="podium-block" style={{ height: `${heights[i] * 0.26}vh` }}>
                 <span>{places[i]}</span>
               </div>
@@ -204,7 +263,11 @@ export function Podium({ rows, stats }: { rows: RankRow[]; stats?: PodiumStats }
         <div className="stat red">
           <div className="stat-label">Most caught red flag</div>
           <div className="stat-text">{stats?.topRed ? `“${stats.topRed.text}”` : '—'}</div>
-          {stats?.topRed && <div className="stat-sub">caught by {stats.topRed.count} {stats.topRed.count === 1 ? 'person' : 'people'}</div>}
+          {stats?.topRed && (
+            <div className="stat-sub">
+              caught by {stats.topRed.count} {stats.topRed.count === 1 ? 'person' : 'people'}
+            </div>
+          )}
         </div>
         <div className="stat green">
           <div className="stat-label">Most ignored green flag</div>
