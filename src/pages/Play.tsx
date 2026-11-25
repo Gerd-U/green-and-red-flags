@@ -4,6 +4,7 @@ import Avatar from '../components/Avatar'
 import PolyBackground from '../components/PolyBackground'
 import { POWERS } from '../data/cards'
 import { randomAvatar, sanitizeAvatar } from '../lib/avatar'
+import { randomProfileLine, sanitizeProfileLine } from '../data/profiles'
 import { mainTopic, normalizeCode, openChannel, playerTopic, type Room } from '../lib/room'
 import { getPlayerId, load, save } from '../lib/storage'
 import type {
@@ -23,6 +24,7 @@ import PlayerGame from '../player/PlayerGame'
 interface Profile {
   name: string
   avatar: AvatarConfig | null
+  bio?: string
   room: string
   ready: boolean
 }
@@ -55,6 +57,7 @@ export default function Play() {
   const [room, setRoom] = useState(urlRoom || saved?.room || '')
   const [name, setName] = useState(saved?.name ?? '')
   const [avatar, setAvatar] = useState<AvatarConfig>(() => (saved?.avatar ? sanitizeAvatar(saved.avatar) : randomAvatar()))
+  const [bio, setBio] = useState<string>(() => (saved?.bio ? sanitizeProfileLine(saved.bio) : randomProfileLine()))
   const [ready, setReady] = useState(Boolean(saved?.ready && saved.room === room && saved.avatar))
   const [step, setStep] = useState<Step>(() => {
     if (!room || !name) return 'join'
@@ -63,9 +66,9 @@ export default function Play() {
   })
 
   useEffect(() => {
-    save('gr.profile' + slot, { name, avatar, room, ready } satisfies Profile)
+    save('gr.profile' + slot, { name, avatar, bio, room, ready } satisfies Profile)
     if (room) save('gr.lastRoom', room)
-  }, [name, avatar, room, ready, slot])
+  }, [name, avatar, bio, room, ready, slot])
 
   const submitJoin = (e: FormEvent) => {
     e.preventDefault()
@@ -120,9 +123,14 @@ export default function Play() {
         <Editor
           name={name}
           initial={avatar}
-          onChange={setAvatar}
-          onReady={(a) => {
+          initialBio={bio}
+          onChange={(a, b) => {
             setAvatar(a)
+            setBio(b)
+          }}
+          onReady={(a, b) => {
+            setAvatar(a)
+            setBio(b)
             setReady(true)
             setStep('room')
           }}
@@ -137,6 +145,7 @@ export default function Play() {
       code={room}
       name={name}
       avatar={avatar}
+      bio={bio}
       ready={ready}
       onEdit={() => {
         setReady(false)
@@ -157,12 +166,13 @@ interface RoomProps {
   code: string
   name: string
   avatar: AvatarConfig
+  bio: string
   ready: boolean
   onEdit: () => void
   onLeave: () => void
 }
 
-function PlayerRoom({ me, code, name, avatar, ready, onEdit, onLeave }: RoomProps) {
+function PlayerRoom({ me, code, name, avatar, bio, ready, onEdit, onLeave }: RoomProps) {
   const [status, setStatus] = useState('connecting')
   const [state, setState] = useState<GameState | null>(null)
   const [players, setPlayers] = useState<PlayerInfo[]>([])
@@ -226,13 +236,13 @@ function PlayerRoom({ me, code, name, avatar, ready, onEdit, onLeave }: RoomProp
         if (!m) continue
         if (m.role === 'admin') admin = true
         else if (m.role === 'player' && m.avatar)
-          list.push({ id: m.id, name: m.name, avatar: sanitizeAvatar(m.avatar), ready: m.ready, online: true })
+          list.push({ id: m.id, name: m.name, avatar: sanitizeAvatar(m.avatar), bio: sanitizeProfileLine(m.bio), ready: m.ready, online: true })
       }
       setAdminOnline(admin)
       setPlayers(list)
     })
     main.subscribe(() => {
-      main.channel.track({ role: 'player', id: me, name, avatar, ready }).catch(() => {})
+      main.channel.track({ role: 'player', id: me, name, avatar, bio, ready }).catch(() => {})
       main.send('hello', { id: me })
     })
     mine.subscribe()
@@ -247,8 +257,8 @@ function PlayerRoom({ me, code, name, avatar, ready, onEdit, onLeave }: RoomProp
   // keep presence up to date
   useEffect(() => {
     const main = mainRef.current
-    if (main?.ready) main.channel.track({ role: 'player', id: me, name, avatar, ready }).catch(() => {})
-  }, [name, avatar, ready, me, status])
+    if (main?.ready) main.channel.track({ role: 'player', id: me, name, avatar, bio, ready }).catch(() => {})
+  }, [name, avatar, bio, ready, me, status])
 
   // re-sync when the phone wakes up
   useEffect(() => {
@@ -358,7 +368,7 @@ function PlayerRoom({ me, code, name, avatar, ready, onEdit, onLeave }: RoomProp
           {state?.phase === 'podium' ? (
             <div className="wait-center">
               <div className="big-place">#{myPlace || '-'}</div>
-              <Avatar config={avatar} size={150} mood={myPlace === 1 ? 'happy' : undefined} />
+              <Avatar config={avatar} size={150} pose={myPlace === 1 ? 'cheer' : 'idle'} />
               <h2 className="wait-title">{myPlace === 1 ? 'You won!' : 'Game over!'}</h2>
               <p className="muted">Final score: {myTotal}. Look at the big screen!</p>
             </div>
@@ -416,7 +426,7 @@ function PlayerRoom({ me, code, name, avatar, ready, onEdit, onLeave }: RoomProp
           {defense.playerId === me ? (
             <div className="defense-me">
               <div className="chip red">Red flag!</div>
-              <Avatar config={avatar} size={120} mood={defense.stage === 'result' && defense.result === 'convinced' ? 'happy' : 'horror'} />
+              <Avatar config={avatar} size={120} pose={defense.stage === 'result' && defense.result === 'convinced' ? 'cheer' : 'scared'} />
               <p className="quote">“{defense.text}”</p>
               {defense.stage === 'talk' && <h2 className="shout">Defend yourself! Explain in English why it&apos;s not so bad.</h2>}
               {defense.stage === 'vote' && <h2 className="shout">The others are voting...</h2>}

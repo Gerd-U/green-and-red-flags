@@ -18,7 +18,7 @@ export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: 
         <div
           key={r.player.id}
           className={`rank-row ${i === 0 ? 'first' : ''} ${r.lives <= 0 ? 'out' : ''}`}
-          style={{ transform: `translateY(${i * ROW_H}px)`, height: ROW_H - 8, ['--pc' as string]: r.player.avatar.color1 }}
+          style={{ transform: `translateY(${i * ROW_H}px)`, height: ROW_H - 8, ['--pc' as string]: r.player.avatar.topColor }}
         >
           <span className="rank-pos">{i + 1}</span>
           <Avatar config={r.player.avatar} size={compact ? 38 : 50} animate={false} dim={r.lives <= 0} />
@@ -52,10 +52,14 @@ export function Lobby({ players, code, joinUrl }: { players: PlayerInfo[]; code:
       <div className="lobby-players">
         {players.map((p) => (
           <div key={p.id} className={`lobby-player ${p.ready ? 'ready' : ''}`}>
+            <div className="lp-top">
+              <span className="lp-heart">♥</span> Dating profile
+            </div>
             <div className="lp-avatar">
-              <Avatar config={p.avatar} size={120} />
+              <Avatar config={p.avatar} size={110} pose={p.ready ? 'dance' : 'idle'} />
             </div>
             <div className="lp-name">{p.name}</div>
+            <div className="lp-bio">“{p.bio}”</div>
             <div className="lp-status">{p.ready ? '✔ Ready' : 'Building…'}</div>
           </div>
         ))}
@@ -94,7 +98,7 @@ export function DefenseView({
           <Avatar
             config={player?.avatar}
             size={300}
-            mood={d.stage === 'result' ? (ok ? 'happy' : 'horror') : 'horror'}
+            pose={d.stage === 'result' ? (ok ? 'cheer' : 'scared') : 'scared'}
           />
         </div>
         <div className="defense-info">
@@ -155,11 +159,11 @@ export function SabotageAnim({ ev, players }: { ev: SabotageEvent; players: Reco
     <div className="sabotage-anim" key={ev.key} style={{ ['--pw' as string]: p.color }}>
       <div className="sab-row">
         <div className="sab-from">
-          <Avatar config={from?.avatar} size={130} mood="happy" />
+          <Avatar config={from?.avatar} size={130} pose="cheer" />
         </div>
         <div className="sab-bolt">{p.emoji}</div>
         <div className="sab-to">
-          <Avatar config={to?.avatar} size={130} mood="horror" effect={ev.power} />
+          <Avatar config={to?.avatar} size={130} pose="scared" effect={ev.power} />
         </div>
       </div>
       <div className="sab-text">
@@ -183,7 +187,7 @@ export function Podium({ rows, stats }: { rows: RankRow[]; stats?: PodiumStats }
             <div key={r.player.id} className={`podium-col place-${places[i]}`}>
               <div className={places[i] === 1 ? 'winner-avatar' : 'podium-avatar'}>
                 {places[i] === 1 && <div className="confetti" aria-hidden="true" />}
-                <Avatar config={r.player.avatar} size={places[i] === 1 ? 200 : 150} mood={places[i] === 1 ? 'happy' : undefined} />
+                <Avatar config={r.player.avatar} size={places[i] === 1 ? 200 : 150} pose={places[i] === 1 ? 'cheer' : 'idle'} />
               </div>
               <div className="podium-name">{r.player.name}</div>
               <div className="podium-score">{r.score} pts</div>

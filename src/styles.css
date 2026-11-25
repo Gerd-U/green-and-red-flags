@@ -246,72 +246,121 @@ code {
   background: #ffffff22;
 }
 
-/* ---------------- avatar ---------------- */
+/* ---------------- avatar (chibi person) ---------------- */
 .avatar {
   display: block;
   overflow: visible;
 }
-.avatar-body {
+.avatar g[class^='av-'] {
   transform-box: fill-box;
-  transform-origin: 50% 100%;
 }
-.avatar-anim .avatar-body {
-  animation: breathe 1.6s ease-in-out infinite;
-}
-.avatar-anim.delay .avatar-body,
-.delay .avatar-anim .avatar-body {
-  animation-delay: -0.8s;
-}
+.av-root { transform-origin: 50% 100%; }
+.av-head { transform-origin: 50% 90%; }
+.av-arm-l, .av-arm-r { transform-origin: 50% 6%; transition: transform 0.18s ease-out; }
+.av-leg-l, .av-leg-r { transform-origin: 50% 0%; }
+
+/* idle: breathing */
+.pose-idle .av-root { animation: breathe 1.8s ease-in-out infinite; }
+.pose-idle .av-head { animation: nod 3.6s ease-in-out infinite; }
+.delay .pose-idle .av-root, .pose-idle.delay .av-root { animation-delay: -0.9s; }
+
+/* walk: legs and arms alternate */
+.pose-walk .av-leg-l { animation: stepA 0.36s ease-in-out infinite; }
+.pose-walk .av-leg-r { animation: stepB 0.36s ease-in-out infinite; }
+.pose-walk .av-arm-l { animation: stepB 0.36s ease-in-out infinite; }
+.pose-walk .av-arm-r { animation: stepA 0.36s ease-in-out infinite; }
+.pose-walk .av-root { animation: bob 0.18s ease-in-out infinite alternate; }
+
+/* cheer: arms up + jump */
+.pose-cheer .av-arm-l { transform: rotate(150deg); }
+.pose-cheer .av-arm-r { transform: rotate(-150deg); }
+.pose-cheer .av-root { animation: hop 0.45s ease-out infinite; }
+
+/* scared: hands on the face + shiver */
+.pose-scared .av-arm-l { transform: rotate(-145deg); }
+.pose-scared .av-arm-r { transform: rotate(145deg); }
+.pose-scared .av-root { animation: shiver 0.1s linear infinite; }
+
+/* cry: slump + falling tears */
+.pose-cry .av-root { animation: sob 0.6s ease-in-out infinite; }
+.pose-cry .av-head { transform: rotate(4deg) translateY(2px); }
+.pose-cry .av-arm-l { transform: rotate(-20deg); }
+.pose-cry .av-arm-r { transform: rotate(20deg); }
+.av-tears { animation: tears 0.7s linear infinite; }
+
+/* dance: sway + alternating arms */
+.pose-dance .av-root { animation: sway 0.6s ease-in-out infinite alternate; }
+.pose-dance .av-arm-l { animation: danceA 0.6s ease-in-out infinite alternate; }
+.pose-dance .av-arm-r { animation: danceB 0.6s ease-in-out infinite alternate; }
+.pose-dance .av-leg-l { animation: stepA 0.6s ease-in-out infinite alternate; }
+
 @keyframes breathe {
   0%, 100% { transform: translateY(0) scale(1, 1); }
-  40% { transform: translateY(-4px) scale(0.97, 1.04); }
-  60% { transform: translateY(-5px) scale(0.98, 1.03); }
+  50% { transform: translateY(-2px) scale(0.985, 1.02); }
 }
-.avatar.mood-happy .avatar-body {
-  animation: hop 0.4s ease-out;
+@keyframes nod {
+  0%, 100% { transform: rotate(0); }
+  30% { transform: rotate(-3deg); }
+  60% { transform: rotate(2deg); }
 }
-.avatar.mood-horror .avatar-body {
-  animation: shiver 0.12s linear infinite;
+@keyframes stepA {
+  0%, 100% { transform: rotate(22deg); }
+  50% { transform: rotate(-22deg); }
+}
+@keyframes stepB {
+  0%, 100% { transform: rotate(-22deg); }
+  50% { transform: rotate(22deg); }
+}
+@keyframes bob {
+  to { transform: translateY(-3px); }
 }
 @keyframes hop {
-  0% { transform: translateY(0) scale(1.08, 0.9); }
-  50% { transform: translateY(-14px) scale(0.94, 1.08); }
-  100% { transform: translateY(0); }
+  0% { transform: translateY(0) scale(1.06, 0.94); }
+  45% { transform: translateY(-16px) scale(0.96, 1.05); }
+  100% { transform: translateY(0) scale(1, 1); }
 }
 @keyframes shiver {
   0%, 100% { transform: translateX(-2px); }
   50% { transform: translateX(2px); }
 }
+@keyframes sob {
+  0%, 100% { transform: translateY(2px) scale(1, 0.97); }
+  50% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes tears {
+  from { transform: translateY(-3px); opacity: 1; }
+  to { transform: translateY(10px); opacity: 0.2; }
+}
+@keyframes sway {
+  from { transform: rotate(-8deg) translateY(0); }
+  to { transform: rotate(8deg) translateY(-6px); }
+}
+@keyframes danceA {
+  from { transform: rotate(160deg); }
+  to { transform: rotate(40deg); }
+}
+@keyframes danceB {
+  from { transform: rotate(-40deg); }
+  to { transform: rotate(-160deg); }
+}
+
 .avatar-dim {
   filter: grayscale(1) brightness(0.6);
 }
 /* sabotage visual effects on the character */
-.avatar.fx-mixedsignals .avatar-body {
-  animation: shake 0.09s linear infinite;
-}
-.avatar.fx-gaslighting .avatar-body {
-  animation: dizzy 0.9s ease-in-out infinite;
-}
-.avatar.fx-ghosting {
-  filter: blur(2px);
-  opacity: 0.55;
-}
-.avatar.fx-exback {
-  filter: hue-rotate(160deg) saturate(0.5) brightness(1.15) drop-shadow(0 0 8px #7dd3fc);
-}
-.avatar.fx-exback .avatar-body {
-  animation: none;
-}
-.avatar.fx-lovebombing {
-  filter: drop-shadow(0 0 10px #ff5fa2);
-}
-.fx-hearts {
-  animation: floatUp 1.2s ease-in-out infinite alternate;
-}
-.fx-spiral {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: spin 0.8s linear infinite;
+.avatar.fx-mixedsignals { animation: shake 0.09s linear infinite; }
+.avatar.fx-gaslighting .av-root { animation: dizzy 0.9s ease-in-out infinite; }
+.avatar.fx-ghosting { filter: blur(2px); opacity: 0.55; }
+.avatar.fx-exback { filter: saturate(0.4) brightness(1.15) drop-shadow(0 0 8px #7dd3fc); }
+.avatar.fx-exback .av-root,
+.avatar.fx-exback g[class^='av-'] { animation: none !important; }
+.avatar.fx-lovebombing { filter: drop-shadow(0 0 10px #ff5fa2); }
+.fx-hearts { animation: floatUp 1.2s ease-in-out infinite alternate; }
+.fx-spiral { transform-box: fill-box; transform-origin: center; animation: spin 0.8s linear infinite; }
+.fx-shield { animation: shieldPulse 1s ease-in-out infinite alternate; }
+@keyframes shieldPulse {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
 }
 @keyframes shake {
   0% { transform: translate(-3px, 1px) rotate(-3deg); }
@@ -389,11 +438,11 @@ code {
 .editor {
   max-width: 520px;
   margin: 0 auto;
-  min-height: 100%;
-  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  height: 100%;
+  padding: max(10px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .editor-head {
   display: flex;
@@ -404,68 +453,57 @@ code {
   font-size: 20px;
 }
 .editor-preview {
+  border: 0;
+  background: transparent;
+  color: inherit;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-.arrow-btn {
-  width: 56px;
-  height: 56px;
-  border: 0;
-  background: #ffffff1a;
-  color: #fff;
-  font-size: 22px;
-  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
-  transition: transform 0.1s;
-}
-.arrow-btn:active {
-  transform: scale(0.88);
-  background: var(--green);
+  justify-content: center;
+  gap: 12px;
+  padding: 0;
 }
 .preview-stage {
   position: relative;
   display: grid;
   place-items: center;
-  height: 220px;
-  flex: 1;
+  height: min(220px, 27vh);
 }
-.preview-pop {
-  animation: popIn 0.25s ease-out;
+.preview-stage svg {
+  height: 100%;
+  width: auto;
   position: relative;
   z-index: 1;
 }
 .preview-shadow {
   position: absolute;
-  bottom: 16px;
-  width: 120px;
-  height: 18px;
+  bottom: 2px;
+  width: 90px;
+  height: 14px;
   background: #0006;
   clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%);
 }
-@keyframes popIn {
-  from { transform: scale(0.85) rotate(-4deg); }
-  to { transform: scale(1) rotate(0); }
-}
-.option-label {
-  text-align: center;
+.preview-bio {
+  max-width: 46%;
   font-weight: 800;
-  font-size: 18px;
-  color: var(--yellow);
+  font-size: 15px;
+  background: #ff5fa2;
+  color: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
 }
 .tabs {
   display: flex;
   gap: 4px;
-  overflow-x: auto;
 }
 .tab {
   flex: 1;
   border: 0;
-  padding: 10px 6px;
+  padding: 10px 4px;
   background: #ffffff12;
   color: var(--muted);
   font-weight: 800;
-  font-size: 14px;
+  font-size: 15px;
   clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
 }
 .tab.active {
@@ -473,61 +511,85 @@ code {
   color: #06210f;
 }
 .editor-options {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   background: #0000002a;
-  padding: 10px;
-  min-height: 170px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-.thumb-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+.ed-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.thumb-row,
+.swatch-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  touch-action: pan-x;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  flex-shrink: 0;
 }
 .thumb {
+  flex: 0 0 auto;
   border: 2px solid transparent;
   background: #ffffff0d;
   color: var(--text);
-  padding: 6px 2px 4px;
+  padding: 4px 4px 3px;
+  min-width: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
 }
-.thumb svg {
-  height: 64px;
-  width: auto;
-}
+.thumb.head svg { height: 54px; width: auto; overflow: hidden; }
+.thumb.full svg { height: 64px; width: auto; }
 .thumb.active {
   background: #22c55e33;
   border-color: var(--green);
 }
-.color-rows {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.swatches {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-}
 .swatch {
-  aspect-ratio: 1;
-  border: 3px solid transparent;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   transition: transform 0.1s;
 }
 .swatch.active {
-  transform: scale(1.12);
-  border-color: #fff;
-  box-shadow: inset 0 0 0 3px #fff;
+  box-shadow: inset 0 0 0 5px #fff, inset 0 0 0 8px #1b1030;
+}
+.bio-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bio {
+  border: 0;
+  background: #ffffff14;
+  color: var(--text);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 10px;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.bio.active {
+  background: #ff5fa2;
+  color: #fff;
 }
 .editor-actions {
   display: grid;
   grid-template-columns: 1fr 2fr;
   gap: 10px;
-  margin-top: auto;
 }
 
 /* ---------------- phone: waiting ---------------- */
@@ -1042,15 +1104,35 @@ code {
   display: flex;
   flex-direction: column;
   align-items: center;
+  background: #fff;
+  color: var(--ink);
+  padding: 1vh 1vw 1.4vh;
+  box-shadow: 0 10px 30px #0008;
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
   animation: dropIn 0.5s cubic-bezier(0.2, 1.5, 0.4, 1);
   position: relative;
 }
 @keyframes dropIn {
   from { transform: translateY(-60px) scale(0.6); opacity: 0; }
 }
+.lp-top {
+  align-self: stretch;
+  font-size: clamp(11px, 0.9vw, 16px);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #ff2d6f;
+}
 .lp-avatar svg {
-  width: clamp(100px, 10vw, 180px);
-  height: auto;
+  height: clamp(90px, 17vh, 200px);
+  width: auto;
+}
+.lp-bio {
+  font-size: clamp(13px, 1.15vw, 22px);
+  font-weight: 700;
+  text-align: center;
+  color: #5b4a75;
+  min-height: 2.4em;
 }
 .lp-name {
   font-size: clamp(18px, 1.6vw, 30px);
@@ -1059,10 +1141,10 @@ code {
 }
 .lp-status {
   font-size: clamp(13px, 1vw, 18px);
-  color: var(--muted);
-  font-weight: 700;
+  color: #6b5b86;
+  font-weight: 800;
   padding: 3px 12px;
-  background: #ffffff14;
+  background: #ece6f6;
   margin-top: 4px;
 }
 .lobby-player.ready .lp-status {
@@ -1516,7 +1598,7 @@ code {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatar-anim .avatar-body,
+  .avatar .av-root,
   .winner-avatar,
   .confetti,
   .defend-shout {

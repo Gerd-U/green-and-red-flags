@@ -356,7 +356,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, tilt, out, onT
             width: `${PLAYER_W * 100}%`,
           }}
         >
-          <Avatar config={avatar} mood={s.mood} effect={fx} size={100} dim={out} />
+          <Avatar config={avatar} pose={s.mood === 'happy' ? 'cheer' : s.mood === 'horror' ? 'scared' : 'idle'} effect={fx} size={100} dim={out} />
         </div>
 
         {s.effects.length > 0 && (

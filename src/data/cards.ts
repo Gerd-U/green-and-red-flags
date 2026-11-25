@@ -111,6 +111,13 @@ export const POWERS: Record<PowerId, Power> = {
     color: '#38bdf8',
     hint: 'You are frozen!',
   },
+  therapy: {
+    id: 'therapy',
+    name: 'Therapy',
+    emoji: '🛡️',
+    color: '#22d3ee',
+    hint: 'Shield ready: blocks the next sabotage',
+  },
 }
 
 export const POWER_IDS = Object.keys(POWERS) as PowerId[]

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { sanitizeAvatar } from '../lib/avatar'
+import { sanitizeProfileLine } from '../data/profiles'
 import { COUNTDOWN_MS, DEFENSE_MS, RED_PENALTY, ROUND_MS, START_LIVES } from '../lib/game'
 import { randomSeed } from '../lib/rng'
 import { mainTopic, openChannel, playerTopic, type Room } from '../lib/room'
@@ -478,6 +479,7 @@ export function useAdminGame(code: string) {
           id: m.id,
           name: String(m.name || 'Player').slice(0, 14),
           avatar: sanitizeAvatar(m.avatar),
+          bio: sanitizeProfileLine(m.bio),
           ready: Boolean(m.ready),
           online: true,
         }

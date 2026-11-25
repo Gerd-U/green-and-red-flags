@@ -1,50 +1,102 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Avatar from '../components/Avatar'
-import { COLORS, PARTS, randomAvatar, type PartKey } from '../lib/avatar'
-import type { AvatarConfig } from '../lib/types'
+import { PROFILE_LINES } from '../data/profiles'
+import {
+  ACCESSORIES,
+  BOTTOMS,
+  COLORS,
+  EYES,
+  HAIR_COLORS,
+  HAIRS,
+  MOUTHS,
+  pretty,
+  randomAvatar,
+  SHOES,
+  SKINS,
+  TOPS,
+} from '../lib/avatar'
+import type { AvatarConfig, Pose } from '../lib/types'
 
-type Tab = PartKey | 'colors'
-
+type Tab = 'face' | 'hair' | 'clothes' | 'extras'
 const TABS: { key: Tab; label: string }[] = [
-  ...PARTS.map((p) => ({ key: p.key as Tab, label: p.label })),
-  { key: 'colors', label: 'Colors' },
+  { key: 'face', label: 'Face' },
+  { key: 'hair', label: 'Hair' },
+  { key: 'clothes', label: 'Clothes' },
+  { key: 'extras', label: 'Extras' },
 ]
-
-const pretty = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 interface Props {
   name: string
   initial: AvatarConfig
-  onReady: (avatar: AvatarConfig) => void
-  onChange?: (avatar: AvatarConfig) => void
+  initialBio: string
+  onReady: (avatar: AvatarConfig, bio: string) => void
+  onChange?: (avatar: AvatarConfig, bio: string) => void
 }
 
-export default function Editor({ name, initial, onReady, onChange }: Props) {
+export default function Editor({ name, initial, initialBio, onReady, onChange }: Props) {
   const [avatar, setAvatar] = useState<AvatarConfig>(initial)
-  const [tab, setTab] = useState<Tab>('body')
-  const [pop, setPop] = useState(0)
+  const [bio, setBio] = useState(initialBio)
+  const [tab, setTab] = useState<Tab>('face')
+  const [pose, setPose] = useState<Pose>('idle')
 
-  const update = (next: AvatarConfig) => {
+  useEffect(() => {
+    if (pose === 'idle') return
+    const t = setTimeout(() => setPose('idle'), 900)
+    return () => clearTimeout(t)
+  }, [pose])
+
+  const set = <K extends keyof AvatarConfig>(key: K, value: AvatarConfig[K]) => {
+    const next = { ...avatar, [key]: value }
     setAvatar(next)
-    setPop((n) => n + 1)
-    onChange?.(next)
+    setPose('cheer')
+    onChange?.(next, bio)
   }
 
-  const part = PARTS.find((p) => p.key === tab)
-
-  const cycle = (dir: 1 | -1) => {
-    if (part) {
-      const list = part.options
-      const i = list.indexOf(avatar[part.key])
-      const next = list[(i + dir + list.length) % list.length]
-      update({ ...avatar, [part.key]: next } as AvatarConfig)
-    } else {
-      const i = COLORS.indexOf(avatar.color1)
-      update({ ...avatar, color1: COLORS[(i + dir + COLORS.length) % COLORS.length] })
-    }
+  const pickBio = (line: string) => {
+    setBio(line)
+    onChange?.(avatar, line)
   }
 
-  const currentLabel = part ? pretty(avatar[part.key]) : 'Main color'
+  // thumbnails: the current character with one part swapped
+  const thumbs = <K extends keyof AvatarConfig>(key: K, options: readonly AvatarConfig[K][], crop: 'head' | 'full') => (
+    <div className="thumb-row">
+      {options.map((opt) => {
+        const cfg = { ...avatar, [key]: opt }
+        return (
+          <button
+            key={String(opt)}
+            className={`thumb ${avatar[key] === opt ? 'active' : ''} ${crop}`}
+            onClick={() => set(key, opt)}
+            aria-label={pretty(String(opt))}
+          >
+            <Avatar config={cfg} size={crop === 'head' ? 52 : 46} crop={crop} animate={false} />
+            <span>{pretty(String(opt))}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const swatches = (key: 'skin' | 'hairColor' | 'topColor' | 'bottomColor', colors: string[]) => (
+    <div className="swatch-row">
+      {colors.map((c) => (
+        <button
+          key={c}
+          className={`swatch ${avatar[key] === c ? 'active' : ''}`}
+          style={{ background: c }}
+          onClick={() => set(key, c)}
+          aria-label={`${key} ${c}`}
+        />
+      ))}
+    </div>
+  )
+
+  const section = (label: string, body: ReactNode) => (
+    <div className="ed-section">
+      <div className="label">{label}</div>
+      {body}
+    </div>
+  )
 
   return (
     <div className="editor">
@@ -53,21 +105,13 @@ export default function Editor({ name, initial, onReady, onChange }: Props) {
         <strong className="editor-name">{name}</strong>
       </div>
 
-      <div className="editor-preview">
-        <button className="arrow-btn" onClick={() => cycle(-1)} aria-label="Previous option">
-          ◀
-        </button>
-        <div className="preview-stage" key={pop}>
-          <div className="preview-pop">
-            <Avatar config={avatar} size={150} />
-          </div>
+      <button className="editor-preview" onClick={() => setPose('dance')} aria-label="Preview (tap to dance)">
+        <div className="preview-stage">
+          <Avatar config={avatar} size={128} pose={pose} />
           <div className="preview-shadow" />
         </div>
-        <button className="arrow-btn" onClick={() => cycle(1)} aria-label="Next option">
-          ▶
-        </button>
-      </div>
-      <div className="option-label">{currentLabel}</div>
+        <div className="preview-bio">“{bio}”</div>
+      </button>
 
       <div className="tabs" role="tablist">
         {TABS.map((t) => (
@@ -84,59 +128,58 @@ export default function Editor({ name, initial, onReady, onChange }: Props) {
       </div>
 
       <div className="editor-options">
-        {part ? (
-          <div className="thumb-grid">
-            {part.options.map((opt) => {
-              const cfg = { ...avatar, [part.key]: opt } as AvatarConfig
-              const active = avatar[part.key] === opt
-              return (
-                <button
-                  key={opt}
-                  className={`thumb ${active ? 'active' : ''}`}
-                  onClick={() => update(cfg)}
-                  aria-label={pretty(opt)}
-                >
-                  <Avatar config={cfg} size={54} animate={false} />
-                  <span>{pretty(opt)}</span>
-                </button>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="color-rows">
-            <div className="label">Main color</div>
-            <div className="swatches">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={`swatch ${avatar.color1 === c ? 'active' : ''}`}
-                  style={{ background: c }}
-                  onClick={() => update({ ...avatar, color1: c })}
-                  aria-label={`Main color ${c}`}
-                />
-              ))}
-            </div>
-            <div className="label">Accent color</div>
-            <div className="swatches">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  className={`swatch ${avatar.color2 === c ? 'active' : ''}`}
-                  style={{ background: c }}
-                  onClick={() => update({ ...avatar, color2: c })}
-                  aria-label={`Accent color ${c}`}
-                />
-              ))}
-            </div>
-          </div>
+        {tab === 'face' && (
+          <>
+            {section('Skin', swatches('skin', SKINS))}
+            {section('Eyes', thumbs('eyes', EYES, 'head'))}
+            {section('Mouth', thumbs('mouth', MOUTHS, 'head'))}
+          </>
+        )}
+        {tab === 'hair' && (
+          <>
+            {section('Hairstyle', thumbs('hair', HAIRS, 'head'))}
+            {section('Hair color', swatches('hairColor', HAIR_COLORS))}
+          </>
+        )}
+        {tab === 'clothes' && (
+          <>
+            {section('Top', thumbs('top', TOPS, 'full'))}
+            {section('Top color', swatches('topColor', COLORS))}
+            {section('Bottom', thumbs('bottom', BOTTOMS, 'full'))}
+            {section('Bottom color', swatches('bottomColor', COLORS))}
+            {section('Shoes', thumbs('shoes', SHOES, 'full'))}
+          </>
+        )}
+        {tab === 'extras' && (
+          <>
+            {section('Accessory', thumbs('accessory', ACCESSORIES, 'full'))}
+            {section(
+              'Dating profile',
+              <div className="bio-list">
+                {PROFILE_LINES.map((line) => (
+                  <button key={line} className={`bio ${bio === line ? 'active' : ''}`} onClick={() => pickBio(line)}>
+                    {line}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
       <div className="editor-actions">
-        <button className="btn btn-ghost" onClick={() => update(randomAvatar())}>
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            const a = randomAvatar()
+            setAvatar(a)
+            setPose('dance')
+            onChange?.(a, bio)
+          }}
+        >
           🎲 Random
         </button>
-        <button className="btn btn-green btn-big" onClick={() => onReady(avatar)}>
+        <button className="btn btn-green btn-big" onClick={() => onReady(avatar, bio)}>
           Ready!
         </button>
       </div>

@@ -60,7 +60,7 @@ export default function LiveGrid({ players, ticks, lives, scores, seed }: Props)
           <div
             key={p.id}
             className={`mini ${fx ? `mini-fx-${fx}` : ''} ${out ? 'mini-out' : ''}`}
-            style={{ ['--pc' as string]: p.avatar.color1 }}
+            style={{ ['--pc' as string]: p.avatar.topColor }}
           >
             <div className="mini-head">
               <span className="mini-name">{p.name}</span>
@@ -92,7 +92,7 @@ export default function LiveGrid({ players, ticks, lives, scores, seed }: Props)
                 className="mini-char"
                 style={{ left: `${(view?.x ?? 0.5) * 100}%`, top: `${PLAYER_Y * 100}%`, width: `${PLAYER_W * 130}%` }}
               >
-                <Avatar config={p.avatar} mood={tick?.mood} effect={fx} size={60} dim={out} />
+                <Avatar config={p.avatar} pose={tick?.mood === 'happy' ? 'cheer' : tick?.mood === 'horror' ? 'scared' : 'idle'} effect={fx} size={60} dim={out} />
               </div>
               {fx && (
                 <div className="mini-fx-label" style={{ background: POWERS[fx].color }}>

@@ -1,20 +1,41 @@
-export type BodyShape = 'triangle' | 'square' | 'hexagon' | 'rhombus' | 'crystal' | 'pentagon'
-export type EyeStyle = 'normal' | 'angry' | 'tired' | 'hearts' | 'glasses' | 'starry'
-export type MouthStyle = 'smile' | 'serious' | 'surprised' | 'tongue' | 'grin'
-export type HatStyle = 'none' | 'cap' | 'crown' | 'horns' | 'antenna' | 'bow'
+export type HairStyle = 'bald' | 'short' | 'quiff' | 'long' | 'ponytail' | 'bun' | 'afro' | 'mohawk'
+export type EyeStyle = 'normal' | 'happy' | 'angry' | 'tired' | 'hearts' | 'stars'
+export type MouthStyle = 'smile' | 'serious' | 'surprised' | 'tongue' | 'teeth'
+export type TopStyle = 'tshirt' | 'hoodie' | 'jacket' | 'shirt' | 'dress' | 'overalls'
+export type BottomStyle = 'pants' | 'shorts' | 'skirt' | 'ripped'
+export type ShoeStyle = 'sneakers' | 'boots' | 'flipflops' | 'heels'
+export type AccessoryStyle =
+  | 'none'
+  | 'glasses'
+  | 'sunglasses'
+  | 'cap'
+  | 'crown'
+  | 'headphones'
+  | 'earrings'
+  | 'flower'
+  | 'scarf'
+  | 'backpack'
 
 export interface AvatarConfig {
-  body: BodyShape
+  skin: string
+  hair: HairStyle
+  hairColor: string
   eyes: EyeStyle
   mouth: MouthStyle
-  hat: HatStyle
-  color1: string
-  color2: string
+  top: TopStyle
+  topColor: string
+  bottom: BottomStyle
+  bottomColor: string
+  shoes: ShoeStyle
+  accessory: AccessoryStyle
 }
+
+/** What the character is doing (drives the CSS animations). */
+export type Pose = 'idle' | 'walk' | 'cheer' | 'scared' | 'cry' | 'dance'
 
 export type Mood = 'happy' | 'horror' | undefined
 
-export type PowerId = 'gaslighting' | 'ghosting' | 'lovebombing' | 'mixedsignals' | 'exback'
+export type PowerId = 'gaslighting' | 'ghosting' | 'lovebombing' | 'mixedsignals' | 'exback' | 'therapy'
 
 export interface Power {
   id: PowerId
@@ -136,6 +157,7 @@ export interface PresencePlayer {
   id: string
   name: string
   avatar: AvatarConfig | null
+  bio?: string
   ready: boolean
 }
 
@@ -149,6 +171,7 @@ export interface PlayerInfo {
   id: string
   name: string
   avatar: AvatarConfig
+  bio: string
   ready: boolean
   online: boolean
 }

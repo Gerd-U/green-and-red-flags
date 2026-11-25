@@ -6,8 +6,8 @@ import { normalizeCode } from '../lib/room'
 import { load } from '../lib/storage'
 import type { AvatarConfig } from '../lib/types'
 
-const DEMO_A: AvatarConfig = { body: 'crystal', eyes: 'hearts', mouth: 'smile', hat: 'crown', color1: '#22c55e', color2: '#ffd23f' }
-const DEMO_B: AvatarConfig = { body: 'triangle', eyes: 'angry', mouth: 'serious', hat: 'horns', color1: '#ff3b5c', color2: '#8b5cf6' }
+const DEMO_A: AvatarConfig = { skin: '#f5c19c', hair: 'long', hairColor: '#6b3e22', eyes: 'hearts', mouth: 'smile', top: 'dress', topColor: '#22c55e', bottom: 'skirt', bottomColor: '#22c55e', shoes: 'heels', accessory: 'flower' }
+const DEMO_B: AvatarConfig = { skin: '#8d5a36', hair: 'mohawk', hairColor: '#ff3b5c', eyes: 'angry', mouth: 'teeth', top: 'jacket', topColor: '#2d2a3a', bottom: 'ripped', bottomColor: '#3f6fb5', shoes: 'boots', accessory: 'sunglasses' }
 
 export default function Home() {
   const nav = useNavigate()
