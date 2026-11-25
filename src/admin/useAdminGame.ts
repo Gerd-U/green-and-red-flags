@@ -176,7 +176,11 @@ function gameFromSnapshot(s: Snapshot | null): AdminGame {
   g.running = false
   g.defense = null
   g.auto = null
-  for (const p of Object.values(g.players)) p.online = false
+  for (const p of Object.values(g.players)) {
+    p.online = false
+    p.avatar = sanitizeAvatar(p.avatar)
+    p.bio = sanitizeProfileLine(p.bio)
+  }
   return g
 }
 

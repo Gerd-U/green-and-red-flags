@@ -116,6 +116,7 @@ export function sanitizeAvatar(input: unknown): AvatarConfig {
 
 // ---- color helpers ----
 function hexToRgb(hex: string): number[] {
+  if (typeof hex !== 'string' || hex[0] !== '#') hex = '#888888'
   const n = parseInt(hex.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }

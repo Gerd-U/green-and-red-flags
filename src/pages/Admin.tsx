@@ -278,7 +278,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
         <DefenseView game={game} player={game.defense ? game.players[game.defense.playerId] : undefined} autoLeft={autoLeft} />
       )}
 
-      {sabotages[0] && <SabotageAnim ev={sabotages[0]} players={game.players} />}
+      {inRound && sabotages[0] && <SabotageAnim ev={sabotages[0]} players={game.players} />}
       {game.phase !== 'defense' && <Announcer items={announcements} />}
     </div>
   )

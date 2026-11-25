@@ -598,10 +598,10 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
           <p className="muted">
             You are #{myPlace || '-'} · {state.hearts[me] ?? 5} ♥
           </p>
-          {state.summary?.topRed && (
+          {state.summary && (
             <div className="phone-question">
               <div className="label">Red flag of the round</div>
-              <p className="quote">“{state.summary.topRed.text}”</p>
+              {state.summary.topRed && <p className="quote">“{state.summary.topRed.text}”</p>}
               <p className="q">{state.summary.question}</p>
             </div>
           )}
