@@ -1,5 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import PhaseTransition from '../components/PhaseTransition'
 import PolyBackground from '../components/PolyBackground'
+import QRCode from '../components/QRCode'
 import RoundBackdrop from '../components/RoundBackdrop'
 import Tutorial from '../components/Tutorial'
 import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, roundConfig, START_HEARTS, TOTAL_ROUNDS } from '../lib/game'
@@ -24,9 +26,31 @@ export default function Admin() {
   )
 }
 
+/** Controls are hidden while the host phone is connected; mouse move or "H" shows them for 4 s. */
+function useControlsVisible(hostOnline: boolean) {
+  const [until, setUntil] = useState(0)
+  const [, force] = useState(0)
+  useEffect(() => {
+    const show = () => setUntil(performance.now() + 4000)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'h' || e.key === 'H') show()
+    }
+    window.addEventListener('mousemove', show)
+    window.addEventListener('keydown', onKey)
+    const id = setInterval(() => force((n) => n + 1), 500)
+    return () => {
+      window.removeEventListener('mousemove', show)
+      window.removeEventListener('keydown', onKey)
+      clearInterval(id)
+    }
+  }, [])
+  return !hostOnline || performance.now() < until
+}
+
 function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void }) {
   const { g, ticks, catchFx, status, sabotages, announcements, objectionKey, hostOnline, elapsed, actions } = useAdminGame(code)
   const [, setTick] = useState(0)
+  const controlsVisible = useControlsVisible(hostOnline)
 
   // light re-render for timers / ranking
   useEffect(() => {
@@ -37,11 +61,16 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
   const game = g.current
   const now = performance.now()
   const joinUrl = `${window.location.origin}/play?room=${code}`
+  const shortUrl = `${window.location.host}/play`
   const allPlayers = Object.values(game.players)
   const lobbyPlayers = allPlayers.filter((p) => p.online)
-  // players in the game: anyone with a score this game, or online
-  const gamePlayers = allPlayers.filter((p) => p.online || game.totals[p.id] != null)
-  const rows: RankRow[] = gamePlayers
+  const inRound = game.phase === 'playing' || game.phase === 'defense'
+  // during a round only the players who started it are on the grid (late joiners wait for the next one)
+  const gamePlayers = inRound
+    ? game.roundIds.map((id) => game.players[id]).filter(Boolean)
+    : allPlayers.filter((p) => p.online || game.totals[p.id] != null)
+  const rows: RankRow[] = allPlayers
+    .filter((p) => game.totals[p.id] != null || game.roundIds.includes(p.id))
     .map((p) => ({
       player: p,
       score: (game.totals[p.id] ?? 0) + (game.roundScores[p.id] ?? 0),
@@ -56,10 +85,11 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
   const timeLeft = Math.max(0, Math.ceil((cfg.durationMs - Math.max(0, t)) / 1000))
   const countdown = game.phase === 'playing' && t < 0 ? Math.ceil(-t / 1000) : 0
   const readyCount = lobbyPlayers.filter((p) => p.ready).length
-  const inRound = game.phase === 'playing' || game.phase === 'defense'
   const auto = game.auto
   const autoLeft = auto ? (auto.paused ? auto.pausedLeft : Math.max(0, auto.endsAt - now)) : 0
   const activity = Date.now() - game.createdAt
+  const themed = inRound || game.phase === 'roundEnd'
+  const bigJoin = game.phase === 'intro' || game.phase === 'lobby'
 
   // ---- sound ----
   const [musicOn, setMusic] = useState(isMusicOn())
@@ -119,7 +149,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       p.objection = objectionKey
     }
     const a = announcements[0]
-    if (a && a.key !== p.ann) {
+    if (a && a.key !== p.ann && game.phase === 'playing') {
       p.ann = a.key
       playSfx(a.sfx)
     }
@@ -129,152 +159,74 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
     if (window.confirm('Start a brand new room? Players will need the new code.')) onNewRoom()
   }
 
+  // ---- overlays: only one at a time, never over a results screen ----
+  const paused = game.phase === 'playing' && !game.running && t >= 0 && t < cfg.durationMs && t > -COUNTDOWN_MS
+  const overlay: 'countdown' | 'paused' | 'sabotage' | 'announce' | null =
+    game.phase !== 'playing'
+      ? null
+      : countdown > 0
+        ? 'countdown'
+        : paused
+          ? 'paused'
+          : sabotages[0]
+            ? 'sabotage'
+            : announcements[0]
+              ? 'announce'
+              : null
+
+  const b = (label: ReactNode, onClick: () => void, kind = 'ghost', disabled = false) => (
+    <button className={`btn btn-${kind}`} onClick={onClick} disabled={disabled}>
+      {label}
+    </button>
+  )
+
+  const roundLabel =
+    game.phase === 'hotTake'
+      ? `🔥 Hot Take ${game.round} · after ${cfg.name}`
+      : game.round > 0 && !['podium', 'awards', 'final', 'lobby', 'intro', 'tutorial'].includes(game.phase)
+        ? `Round ${game.round} of ${TOTAL_ROUNDS} · ${cfg.name}`
+        : ''
+
   return (
-    <div className={`screen admin ${inRound || game.phase === 'roundEnd' ? `themed theme-${cfg.theme}` : ''}`}>
-      {inRound || game.phase === 'roundEnd' ? <RoundBackdrop theme={cfg.theme} className="admin-bd" /> : <PolyBackground />}
-      <header className="admin-bar">
-        <div className="admin-brand">
-          <span className="g">Green</span>&amp;<span className="r">Red</span> Flags
+    <div className={`proj phase-${game.phase} ${themed ? `themed theme-${cfg.theme}` : ''} ${controlsVisible ? '' : 'no-cursor'}`}>
+      {themed ? <RoundBackdrop theme={cfg.theme} className="admin-bd" /> : <PolyBackground />}
+
+      {/* ---------- top bar ---------- */}
+      <header className="proj-top">
+        <div className="proj-logo">
+          <span className="g">Green</span>
+          <span className="amp">&amp;</span>
+          <span className="r">Red</span> Flags
         </div>
-        <div className="admin-code">
-          Room <b>{code}</b>
+        <div className="proj-center">
+          {roundLabel && <span className="proj-round">{roundLabel}</span>}
+          {inRound && (
+            <span className={`proj-time ${timeLeft <= 10 ? 'urgent' : ''}`}>
+              {game.running || game.phase === 'defense' ? '' : '⏸ '}
+              {timeLeft}s
+            </span>
+          )}
+        </div>
+        <div className="proj-right">
+          <span className="proj-clock" title="Activity time">
+            ⏱ {formatClock(activity)}
+          </span>
+          {hostOnline && <span className="proj-host">🎤 Host</span>}
           <span className={`dot ${status === 'SUBSCRIBED' ? 'on' : ''}`} title={status} />
-        </div>
-        <div className="admin-clock" title="Activity time since the room was created">
-          ⏱ {formatClock(activity)}
-        </div>
-        {hostOnline && <div className="admin-host" title="The host is connected">🎤 Host</div>}
-        {game.round > 0 && game.phase !== 'podium' && game.phase !== 'awards' && game.phase !== 'final' && (
-          <div className="admin-round">
-            Round <b>{game.round}</b> of {TOTAL_ROUNDS} · {cfg.name}
-            {inRound && (
-              <span className={`admin-timer ${timeLeft <= 10 ? 'urgent' : ''}`}>
-                {game.running || game.phase === 'defense' ? '' : '⏸ '}
-                {timeLeft}s
-              </span>
-            )}
-          </div>
-        )}
-        <div className="admin-actions">
-          {game.phase === 'intro' && (
-            <button className="btn btn-green" onClick={actions.openLobby}>
-              Open lobby ▶
-            </button>
-          )}
-          {game.phase === 'lobby' && (
-            <button className="btn btn-green" disabled={readyCount === 0} onClick={actions.startGame}>
-              Start game ▶
-            </button>
-          )}
-          {game.phase === 'tutorial' && (
-            <button className="btn btn-green" onClick={actions.skip}>
-              Skip tutorial ⏭
-            </button>
-          )}
-          {game.phase === 'playing' && (
-            <>
-              <button className="btn btn-ghost" onClick={actions.togglePause}>
-                {game.running ? '⏸ Pause' : '▶ Resume'}
-              </button>
-              <button className="btn btn-ghost small" onClick={actions.endRound}>
-                End round
-              </button>
-            </>
-          )}
-          {game.phase === 'defense' && (
-            <>
-              {auto && (
-                <button className="btn btn-ghost" onClick={actions.togglePause}>
-                  {auto.paused ? '▶ Resume' : '⏸ Hold'}
-                </button>
-              )}
-              {game.defense?.stage === 'talk' && (
-                <button className="btn btn-gold" onClick={actions.objection}>
-                  Objection!
-                </button>
-              )}
-              <button className="btn btn-green" onClick={actions.skip}>
-                {game.defense?.stage === 'talk' ? 'Start vote ⏭' : game.defense?.stage === 'vote' ? 'Close vote ⏭' : 'Continue ▶'}
-              </button>
-            </>
-          )}
-          {(game.phase === 'roundEnd' || game.phase === 'awards') && auto && (
-            <>
-              <button className="btn btn-ghost" onClick={actions.togglePause}>
-                {auto.paused ? '▶ Resume timer' : '⏸ Hold timer'}
-              </button>
-              <button className="btn btn-green" onClick={actions.skip}>
-                {auto.label} now ▶
-              </button>
-            </>
-          )}
-          {game.phase === 'hotTake' && game.hotTake && (
-            <>
-              {game.hotTake.stage === 'vote' ? (
-                <button className="btn btn-green" onClick={actions.htReveal}>
-                  Reveal ▶
-                </button>
-              ) : (
-                <button className="btn btn-gold" onClick={actions.htVerdict}>
-                  Host&apos;s verdict
-                </button>
-              )}
-              <button className="btn btn-green" onClick={actions.htNext}>
-                Next round ▶
-              </button>
-            </>
-          )}
-          {game.phase === 'podium' && (
-            <button className="btn btn-green" onClick={actions.showFinal}>
-              Final thoughts ▶
-            </button>
-          )}
-          {(game.phase === 'podium' || game.phase === 'final') && (
-            <button className="btn btn-ghost" onClick={actions.backToLobby}>
-              Play again
-            </button>
-          )}
-          <button
-            className={`btn btn-ghost small ${musicOn ? '' : 'off'}`}
-            onClick={() => {
-              unlockAudio()
-              setMusicOn(!musicOn)
-              setMusic(!musicOn)
-              if (!musicOn) startMusic(bpm)
-            }}
-            title="Background music"
-          >
-            {musicOn ? '🎵' : '🔇'}
-          </button>
-          <button
-            className={`btn btn-ghost small ${sfxOn ? '' : 'off'}`}
-            onClick={() => {
-              unlockAudio()
-              setSfxOn(!sfxOn)
-              setSfx(!sfxOn)
-            }}
-            title="Sound effects"
-          >
-            {sfxOn ? '🔊' : '🔈'}
-          </button>
-          <button className="btn btn-ghost small" onClick={confirmNewRoom} title="Create a new room code">
-            New room
-          </button>
         </div>
       </header>
 
-      <main className="admin-main">
-        {game.phase === 'intro' && <IntroScreen code={code} joinUrl={joinUrl} players={lobbyPlayers.length} />}
-        {game.phase === 'lobby' && <Lobby players={lobbyPlayers} code={code} joinUrl={joinUrl} />}
-
-        {game.phase === 'tutorial' && (
-          <div className="tutorial-stage">
-            <Tutorial secondsLeft={Math.ceil(Math.max(0, game.tutorialEndsAt - now) / 1000)} />
-          </div>
+      {/* ---------- stage ---------- */}
+      <main className="proj-stage">
+        {game.phase === 'intro' && (
+          <IntroScreen code={code} joinUrl={shortUrl} players={lobbyPlayers.length} qr={<QRCode text={joinUrl} className="qr-big" />} />
         )}
-
+        {game.phase === 'lobby' && (
+          <Lobby players={lobbyPlayers} code={code} joinUrl={shortUrl} qr={<QRCode text={joinUrl} className="qr-big" />} />
+        )}
+        {game.phase === 'tutorial' && <Tutorial secondsLeft={Math.ceil(Math.max(0, game.tutorialEndsAt - now) / 1000)} />}
         {inRound && (
-          <div className="admin-live">
+          <div className="proj-live">
             <LiveGrid
               players={gamePlayers}
               ticks={ticks}
@@ -284,18 +236,16 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
               round={game.round}
               gameSeed={game.gameSeed}
             />
-            <aside className="side-rank">
-              <h3>Ranking</h3>
-              <Ranking rows={rows} compact={rows.length > 6} />
-              <div className="side-join">
-                Join: <b>{code}</b>
-              </div>
+            <aside className="proj-rank">
+              <div className="proj-label">Ranking</div>
+              <Ranking rows={rows} compact />
             </aside>
           </div>
         )}
-
         {game.phase === 'roundEnd' && <RoundResults game={game} rows={rows} autoLeft={autoLeft} paused={Boolean(auto?.paused)} />}
-
+        {game.phase === 'hotTake' && game.hotTake && (
+          <HotTakeView h={game.hotTake} players={game.players} left={Math.max(0, game.hotTake.stageEndsAt - now)} />
+        )}
         {game.phase === 'awards' && (
           <AwardsShow
             awards={game.awards ?? []}
@@ -303,17 +253,22 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
             shownMs={auto ? Math.max(0, Math.max(1, game.awards?.length ?? 0) * AWARD_SHOW_MS + 1500 - autoLeft) : 0}
           />
         )}
-
-        {game.phase === 'hotTake' && game.hotTake && (
-          <HotTakeView h={game.hotTake} players={game.players} left={Math.max(0, game.hotTake.stageEndsAt - now)} />
-        )}
-
         {game.phase === 'podium' && <Podium rows={rows} stats={game.stats} />}
-
         {game.phase === 'final' && <FinalThoughts stats={game.finalStats} players={game.players} />}
       </main>
 
-      {countdown > 0 && (
+      {/* ---------- bottom strip: how to join ---------- */}
+      {!bigJoin && (
+        <footer className="proj-bottom">
+          <span className="proj-label">Join</span>
+          <span className="proj-url">{shortUrl}</span>
+          <span className="proj-code">{code}</span>
+          <QRCode text={joinUrl} className="qr-small" />
+        </footer>
+      )}
+
+      {/* ---------- overlays ---------- */}
+      {overlay === 'countdown' && (
         <div className="overlay countdown-big" key={countdown}>
           <span>{countdown}</span>
           <small>
@@ -322,17 +277,74 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
           <em>{cfg.tagline}</em>
         </div>
       )}
-      {game.phase === 'playing' && !game.running && t >= 0 && t < cfg.durationMs && t > -COUNTDOWN_MS && (
-        <div className="overlay paused-big">⏸ Paused</div>
-      )}
-
+      {overlay === 'paused' && <div className="overlay paused-big">⏸ Paused</div>}
+      {overlay === 'sabotage' && <SabotageAnim ev={sabotages[0]} players={game.players} />}
+      {overlay === 'announce' && <Announcer items={announcements} />}
       {game.phase === 'defense' && (
         <DefenseView game={game} player={game.defense ? game.players[game.defense.playerId] : undefined} autoLeft={autoLeft} />
       )}
-
-      {inRound && sabotages[0] && <SabotageAnim ev={sabotages[0]} players={game.players} />}
-      {game.phase !== 'defense' && <Announcer items={announcements} />}
       {game.phase === 'defense' && <ObjectionOverlay k={objectionKey} />}
+
+      {/* ---------- controls (hidden while the host phone is connected) ---------- */}
+      <div className={`proj-controls ${controlsVisible ? 'show' : ''}`} aria-hidden={!controlsVisible}>
+        {hostOnline && <div className="proj-controls-note">Host connected · press H to show</div>}
+        <div className="proj-controls-row">
+          {game.phase === 'intro' && b('Open lobby ▶', actions.openLobby, 'green')}
+          {game.phase === 'lobby' && b('Start game ▶', actions.startGame, 'green', readyCount === 0)}
+          {game.phase === 'tutorial' && b('Skip tutorial ⏭', actions.skip, 'green')}
+          {game.phase === 'playing' && (
+            <>
+              {b(game.running ? '⏸ Pause' : '▶ Resume', actions.togglePause)}
+              {b('End round', actions.endRound)}
+            </>
+          )}
+          {game.phase === 'defense' && (
+            <>
+              {auto && b(auto.paused ? '▶ Resume' : '⏸ Hold', actions.togglePause)}
+              {game.defense?.stage === 'talk' && b('Objection!', actions.objection, 'gold')}
+              {b(game.defense?.stage === 'talk' ? 'Start vote ⏭' : game.defense?.stage === 'vote' ? 'Close vote ⏭' : 'Continue ▶', actions.skip, 'green')}
+            </>
+          )}
+          {(game.phase === 'roundEnd' || game.phase === 'awards') && auto && (
+            <>
+              {b(auto.paused ? '▶ Resume timer' : '⏸ Hold timer', actions.togglePause)}
+              {b(`${auto.label} now ▶`, actions.skip, 'green')}
+            </>
+          )}
+          {game.phase === 'hotTake' && game.hotTake && (
+            <>
+              {game.hotTake.stage === 'vote' ? b('Reveal ▶', actions.htReveal, 'green') : b("Host's verdict", actions.htVerdict, 'gold')}
+              {b('Next round ▶', actions.htNext, 'green')}
+            </>
+          )}
+          {game.phase === 'podium' && b('Final thoughts ▶', actions.showFinal, 'green')}
+          {(game.phase === 'podium' || game.phase === 'final') && b('Play again', actions.backToLobby)}
+        </div>
+        <div className="proj-controls-row">
+          {b(
+            musicOn ? '🎵 Music' : '🔇 Music',
+            () => {
+              unlockAudio()
+              setMusicOn(!musicOn)
+              setMusic(!musicOn)
+              if (!musicOn) startMusic(bpm)
+            },
+            musicOn ? 'ghost' : 'ghost off'
+          )}
+          {b(
+            sfxOn ? '🔊 Sounds' : '🔈 Sounds',
+            () => {
+              unlockAudio()
+              setSfxOn(!sfxOn)
+              setSfx(!sfxOn)
+            },
+            sfxOn ? 'ghost' : 'ghost off'
+          )}
+          {b('New room…', confirmNewRoom)}
+        </div>
+      </div>
+
+      <PhaseTransition phaseKey={`${game.phase}-${game.round}`} />
     </div>
   )
 }

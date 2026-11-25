@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
 import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, roundConfig, TOTAL_ROUNDS } from '../lib/game'
@@ -12,7 +13,8 @@ export interface RankRow {
 }
 
 export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: boolean }) {
-  const ROW_H = compact ? 60 : 78
+  // row height follows the screen height (same look at 720p and 1080p)
+  const ROW_H = Math.round(Math.max(compact ? 52 : 64, window.innerHeight * (compact ? 0.072 : 0.09)))
   return (
     <div className={`ranking ${compact ? 'compact' : ''}`} style={{ height: rows.length * ROW_H }}>
       {rows.map((r, i) => (
@@ -35,28 +37,21 @@ export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: 
   )
 }
 
-export function Lobby({ players, code, joinUrl }: { players: PlayerInfo[]; code: string; joinUrl: string }) {
+export function Lobby({ players, code, joinUrl, qr }: { players: PlayerInfo[]; code: string; joinUrl: string; qr: ReactNode }) {
+  const ready = players.filter((p) => p.ready).length
   return (
     <div className="lobby">
-      <div className="lobby-join">
-        <div className="label light">Join at</div>
-        <div className="join-url">{joinUrl.replace(/^https?:\/\//, '')}</div>
-        <div className="label light">Room code</div>
-        <div className="room-code">
-          {code.split('').map((ch, i) => (
-            <span key={i}>{ch}</span>
-          ))}
-        </div>
-        <p className="lobby-hint">
-          {players.length === 0 ? 'Waiting for players...' : `${players.filter((p) => p.ready).length} of ${players.length} ready`}
-        </p>
+      <div className="join-card">
+        <div className="proj-label">Scan or go to</div>
+        {qr}
+        <div className="join-url">{joinUrl}</div>
+        <div className="join-code">{code}</div>
+        <div className="join-count">{players.length === 0 ? 'Waiting for players…' : `${ready} of ${players.length} ready`}</div>
       </div>
-      <div className="lobby-players">
+      <div className={`lobby-players n-${Math.min(players.length, 8)}`}>
         {players.map((p) => (
           <div key={p.id} className={`lobby-player ${p.ready ? 'ready' : ''}`}>
-            <div className="lp-top">
-              <span className="lp-heart">♥</span> Dating profile
-            </div>
+            <div className="lp-top">♥ Dating profile</div>
             <div className="lp-avatar">
               <Avatar config={p.avatar} size={110} pose={p.ready ? 'dance' : 'idle'} />
             </div>
@@ -66,9 +61,7 @@ export function Lobby({ players, code, joinUrl }: { players: PlayerInfo[]; code:
           </div>
         ))}
         {players.length === 0 && (
-          <div className="lobby-empty">
-            Open the link, type the code, build your character, pick your dating profile line and press <b>Ready</b>.
-          </div>
+          <div className="lobby-empty">Scan the code, build your character, pick your dating profile line and press Ready.</div>
         )}
       </div>
     </div>
@@ -186,7 +179,6 @@ export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame
             caught by {sum.topRed.count} {sum.topRed.count === 1 ? 'person' : 'people'}
           </div>
         )}
-        <div className="re-question">{sum?.question}</div>
         <div className="re-timer next">
           {paused ? '⏸ ' : ''}
           {`${last ? 'Awards' : 'Next'} in ${Math.ceil(autoLeft / 1000)}`}

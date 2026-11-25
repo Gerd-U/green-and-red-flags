@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import Avatar from '../components/Avatar'
 import { HOTTAKE_SPEAKER_MS, HOTTAKE_VOTE_MS } from '../lib/game'
 import type { AvatarConfig, FinalStats, HotTake, PlayerInfo } from '../lib/types'
@@ -5,8 +6,8 @@ import type { AvatarConfig, FinalStats, HotTake, PlayerInfo } from '../lib/types
 const EX_A: AvatarConfig = { skin: '#f5c19c', hair: 'long', hairColor: '#6b3e22', eyes: 'hearts', mouth: 'smile', top: 'dress', topColor: '#22c55e', bottom: 'skirt', bottomColor: '#22c55e', shoes: 'heels', accessory: 'flower' }
 const EX_B: AvatarConfig = { skin: '#8d5a36', hair: 'mohawk', hairColor: '#ff3b5c', eyes: 'angry', mouth: 'teeth', top: 'jacket', topColor: '#2d2a3a', bottom: 'ripped', bottomColor: '#3f6fb5', shoes: 'boots', accessory: 'sunglasses' }
 
-/** "Red flags vs Green flags" title screen while people arrive. */
-export function IntroScreen({ code, joinUrl, players }: { code: string; joinUrl: string; players: number }) {
+/** "Red flags vs Green flags" title screen while people arrive (QR big in the middle). */
+export function IntroScreen({ code, joinUrl, players, qr }: { code: string; joinUrl: string; players: number; qr: ReactNode }) {
   return (
     <div className="intro">
       <div className="intro-side red">
@@ -15,24 +16,28 @@ export function IntroScreen({ code, joinUrl, players }: { code: string; joinUrl:
           <Avatar config={EX_B} size={200} pose="scared" />
         </div>
         <div className="intro-examples">
-          <span>Checks your phone without asking</span>
-          <span>Gives you the silent treatment</span>
+          <span>Checks your phone</span>
+          <span>Silent treatment</span>
         </div>
       </div>
-      <div className="intro-vs">VS</div>
+      <div className="intro-mid">
+        <div className="intro-vs">VS</div>
+        <div className="join-card">
+          {qr}
+          <div className="join-code">{code}</div>
+          <div className="join-url">{joinUrl}</div>
+          {players > 0 && <div className="join-count">{players} connected</div>}
+        </div>
+      </div>
       <div className="intro-side green">
         <div className="intro-word">GREEN FLAGS</div>
         <div className="intro-avatar">
           <Avatar config={EX_A} size={200} pose="dance" />
         </div>
         <div className="intro-examples">
-          <span>Remembers your coffee order</span>
+          <span>Remembers your order</span>
           <span>Respects your "no"</span>
         </div>
-      </div>
-      <div className="intro-join">
-        Join at <b>{joinUrl.replace(/^https?:\/\//, '')}</b> · code <b className="intro-code">{code}</b>
-        {players > 0 && <span className="intro-count"> · {players} connected</span>}
       </div>
     </div>
   )
@@ -73,7 +78,7 @@ export function HotTakeView({ h, players, left }: { h: HotTake; players: Record<
             <div key={side} className={`ht-col ${side}`}>
               <div className="ht-pct">{pct}%</div>
               <div className="ht-side-name">{side === 'red' ? 'RED FLAG' : 'GREEN FLAG'}</div>
-              <div className="ht-people">
+              <div className="ht-people" hidden={h.stage === 'verdict'}>
                 {list.map((p) => (
                   <div key={p.id} className="ht-person">
                     <Avatar config={p.avatar} size={70} pose={side === 'red' ? 'scared' : 'cheer'} />

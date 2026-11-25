@@ -51,9 +51,11 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
 
   const now = performance.now()
   const n = players.length
-  const cols = n <= 2 ? n || 1 : n <= 4 ? n : n <= 6 ? 3 : 4
+  // up to 4 per row; with 7 players: 4 on top, 3 centered below, all the same size
+  const perRow = n <= 4 ? Math.max(1, n) : Math.ceil(n / 2) > 4 ? 5 : 4
+  const rows = Math.ceil(n / perRow) || 1
   return (
-    <div className="live-grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+    <div className="live-grid" style={{ ['--per-row' as string]: perRow, ['--rows' as string]: rows }}>
       {players.map((p) => {
         const buf = ticks.current[p.id]
         const view = interpolate(buf, now)
@@ -71,8 +73,11 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
             style={{ ['--pc' as string]: p.avatar.topColor }}
           >
             <div className="mini-head">
+              <span className="mini-face">
+                <Avatar config={p.avatar} crop="head" size={30} animate={false} />
+              </span>
               <span className="mini-name">{p.name}</span>
-              {streak >= 1 && <span className={`mini-combo lvl-${Math.min(streak, 3)}`}>x{comboMult(streak)}</span>}
+              <span className="mini-score">{Math.round(scores[p.id] ?? 0)}</span>
               <span className="mini-lives">
                 {Array.from({ length: START_HEARTS }, (_, i) => (
                   <span key={i} className={i < hearts ? 'heart on' : 'heart'}>
@@ -80,7 +85,7 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
                   </span>
                 ))}
               </span>
-              <span className="mini-score">{Math.round(scores[p.id] ?? 0)}</span>
+              <span className={`mini-combo lvl-${Math.min(streak, 3)}`}>{streak >= 1 ? `x${comboMult(streak)}` : ''}</span>
             </div>
             <div className="mini-field">
               {view?.cards.map((c) => {
@@ -97,7 +102,7 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
                       height: `${CARD_H * 100}%`,
                     }}
                   >
-                    {c.k === 'p' ? POWERS[sc?.power ?? 'ghosting'].emoji : sc?.text}
+                    {c.k === 'p' ? POWERS[sc?.power ?? 'ghosting'].emoji : c.k === 's' ? '★' : c.k === 'i' ? '🤢' : ''}
                   </div>
                 )
               })}
