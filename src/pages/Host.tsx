@@ -20,6 +20,9 @@ import { mainTopic, normalizeCode, openChannel, type Room } from '../lib/room'
 import { load } from '../lib/storage'
 import type { GameState, HostInfo } from '../lib/types'
 import HostScript from '../host/HostScript'
+import { CUE_STYLE } from '../host/cues'
+import { useCues } from '../host/useCues'
+import { unlockAudio } from '../lib/sfx'
 
 // /host — the moderator's phone. It never plays: it is a remote control for
 // the projector (which stays the game authority) plus a teleprompter.
@@ -223,9 +226,17 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
   const [showScript, setShowScript] = useState(true)
   const [, force] = useState(0)
   const roomRef = useRef<Room | null>(null)
+  // a tap on "Start hosting" is needed: Chrome on Android only lets a page
+  // vibrate / play sound after the user touched it at least once
+  const [started, setStarted] = useState(() => import.meta.env.DEV && new URLSearchParams(location.search).get('autologin') === '1')
+  const [status, setStatus] = useState('connecting')
+  const [reconnects, setReconnects] = useState(0)
+  const [wakeOk, setWakeOk] = useState(true)
+  const [question, setQuestion] = useState<string | undefined>()
+  const lastReconnect = useRef(0)
 
   useEffect(() => {
-    const room = openChannel(hostTopic(session.code, session.token))
+    const room = openChannel(hostTopic(session.code, session.token), { onStatus: setStatus })
     roomRef.current = room
     room.on<HostInfo>('hostinfo', (m) => {
       setInfo(m)
@@ -242,7 +253,42 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
       document.removeEventListener('visibilitychange', onVis)
       room.close()
     }
-  }, [session])
+  }, [session, reconnects])
+
+  // watchdog: no news from the projector for 8 s -> reopen the channel
+  useEffect(() => {
+    const id = setInterval(() => {
+      const quiet = performance.now() - received
+      if ((quiet > 8000 || status !== 'SUBSCRIBED') && performance.now() - lastReconnect.current > 8000) {
+        lastReconnect.current = performance.now()
+        setReconnects((n) => n + 1)
+      }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [received, status])
+
+  // keep the screen on while hosting (Screen Wake Lock API)
+  useEffect(() => {
+    if (!started) return
+    let lock: { release: () => Promise<void> } | null = null
+    const request = async () => {
+      try {
+        const wl = (navigator as unknown as { wakeLock?: { request: (t: 'screen') => Promise<{ release: () => Promise<void> }> } }).wakeLock
+        if (!wl) throw new Error('unsupported')
+        lock = await wl.request('screen')
+        setWakeOk(true)
+      } catch {
+        setWakeOk(false)
+      }
+    }
+    request()
+    const onVis = () => document.visibilityState === 'visible' && request()
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      lock?.release().catch(() => {})
+    }
+  }, [started])
 
   useEffect(() => {
     const id = setInterval(() => force((n) => n + 1), 500)
@@ -263,6 +309,40 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
 
   const since = info ? performance.now() - received : 0
   const s = info?.state
+  const connected = status === 'SUBSCRIBED' && !!info && since < 6000
+  const cues = useCues(started ? info : null, received, connected, s ? planKey(s) : '')
+
+  if (!started) {
+    return (
+      <div className="screen center host-screen">
+        <PolyBackground variant="dark" />
+        <div className="panel narrow start-hosting">
+          <h1 className="title-sm">Ready to host room {session.code}?</h1>
+          <p className="muted">
+            Your phone will vibrate when it's your turn to talk (one long buzz), when you need to tap a button (two short) and
+            for warnings (three short). Keep the screen on during the activity.
+          </p>
+          <button
+            className="btn btn-green btn-big"
+            onClick={() => {
+              unlockAudio()
+              try {
+                navigator.vibrate?.(60)
+              } catch {
+                /* ignore */
+              }
+              setStarted(true)
+            }}
+          >
+            ▶ Start hosting
+          </button>
+          <button className="btn btn-ghost small" onClick={onLeave}>
+            Leave host
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   if (!info || !s) {
     return (
@@ -300,10 +380,24 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
     </button>
   )
 
+  const b = cues.banner
   return (
     <div className="screen host-screen">
       <PolyBackground variant="dark" />
+      {cues.flash && <div key={cues.flash.n} className={`cue-flash cue-${cues.flash.kind}`} aria-hidden="true" />}
+      {!connected && <div className="cue-disconnected">⚠️ Disconnected — reconnecting…</div>}
       <div className="host-wrap">
+        {b && (
+          <div className={`cue-banner cue-${b.kind}`} key={b.key} role="alert">
+            <div className="cue-head">
+              {CUE_STYLE[b.kind].icon} {CUE_STYLE[b.kind].label} — {b.text}
+            </div>
+            {b.kind === 'speak' && question && <div className="cue-question">“{question}”</div>}
+            <button className="btn cue-ok" onClick={cues.dismiss}>
+              Got it
+            </button>
+          </div>
+        )}
         <header className="host-top">
           <div>
             <div className="host-phase">{phaseLabel(s)}</div>
@@ -325,7 +419,10 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
             {showScript ? 'Hide script' : 'Show script'}
           </button>
         </div>
-        {showScript && <HostScript info={info} />}
+        {/* stays mounted when hidden, so the cue banner can show the current question */}
+        <div hidden={!showScript}>
+          <HostScript info={info} onQuestion={setQuestion} />
+        </div>
 
         {/* ---------- controls per phase ---------- */}
         <section className="host-controls">
@@ -435,6 +532,38 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
           {(s.phase === 'roundEnd' || s.phase === 'hotTake') && s.round >= TOTAL_ROUNDS && (
             <>{btn('awards', <>Go to awards</>, 'ghost')}</>
           )}
+        </section>
+
+        <section className="cue-panel">
+          {!wakeOk && <div className="cue-wake">💡 Keep your screen on during the activity (this browser can't do it automatically).</div>}
+          {cues.history.length > 0 && (
+            <div className="cue-history">
+              <div className="label">Last cues</div>
+              {cues.history.map((c) => (
+                <div key={c.key} className={`cue-hist cue-${c.kind}`}>
+                  <span>{CUE_STYLE[c.kind].icon}</span> {c.text}
+                  <span className="cue-time">{new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="cue-switches">
+            {(
+              [
+                ['vibration', 'Vibration'],
+                ['flash', 'Flash'],
+                ['sound', 'Cue sound'],
+              ] as const
+            ).map(([k, label]) => (
+              <label key={k} className="cue-switch">
+                <input type="checkbox" checked={cues.prefs[k]} onChange={(e) => cues.updatePrefs({ [k]: e.target.checked })} />
+                <span>{label}</span>
+              </label>
+            ))}
+            <button className="btn btn-ghost small" onClick={cues.testCues}>
+              Test cue
+            </button>
+          </div>
         </section>
 
         <footer className="host-footer">

@@ -7,7 +7,7 @@ import { buildScript, orderQuestions, type ScriptQuestion } from './script'
  * question to ask, built from what really happened in the game.
  * It follows the game phase by itself; arrows / Shuffle change the question.
  */
-export default function HostScript({ info }: { info: HostInfo }) {
+export default function HostScript({ info, onQuestion }: { info: HostInfo; onQuestion?: (q?: string) => void }) {
   const view = useMemo(() => buildScript(info), [info])
   const lastShown = useRef<{ text?: string; player?: string }>({})
   const [order, setOrder] = useState<ScriptQuestion[]>(() => orderQuestions(view.questions))
@@ -34,7 +34,8 @@ export default function HostScript({ info }: { info: HostInfo }) {
   const q = order[idx]
   useEffect(() => {
     if (q) lastShown.current = { text: q.text, player: q.player }
-  }, [q])
+    onQuestion?.(q?.text)
+  }, [q, onQuestion])
 
   const move = (d: number) => {
     if (order.length < 2) return

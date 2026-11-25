@@ -179,6 +179,23 @@ export function playSfx(name: Sfx, opts: { level?: number } = {}) {
   }
 }
 
+/**
+ * Quiet "ding" for the host's cues. Separate from the game sounds (it ignores
+ * the sfx mute) and soft on purpose so the class doesn't hear it.
+ */
+export function cueDing(kind: 'speak' | 'act' | 'warn') {
+  const c = ac()
+  if (!c || c.state !== 'running') return
+  const t = c.currentTime + 0.01
+  if (kind === 'speak') tone(N(19), t, 0.35, 'sine', 0.06)
+  else if (kind === 'act') {
+    tone(N(24), t, 0.12, 'sine', 0.05)
+    tone(N(24), t + 0.18, 0.12, 'sine', 0.05)
+  } else {
+    ;[0, 0.14, 0.28].forEach((d) => tone(N(7), t + d, 0.1, 'triangle', 0.06))
+  }
+}
+
 // ---- background music (projector only): a simple chiptune loop ----
 let musicTimer: number | null = null
 let musicGain: GainNode | null = null
