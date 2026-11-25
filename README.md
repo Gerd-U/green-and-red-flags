@@ -1,50 +1,80 @@
 # Green & Red Flags
 
-Juego web multijugador para la actividad de inglés "Green and red flags in a partner". Cada persona arma una personita low poly en su celular y juega un atrapa: tiene que agarrar las green flags y esquivar las red flags que caen. El proyector muestra el juego de todos en vivo, el ranking, las defensas, los premios y el podio.
+Juego web multijugador para la actividad de inglés "Green and red flags in a partner". Cada persona arma una personita low poly en su celular y juega un atrapa: agarrar las green flags y esquivar las red flags. El proyector muestra el juego de todos en vivo, y yo, como host, dirijo el debate desde mi celular con un guion que se arma con lo que pasa en la partida.
 
 Hecho con React, Vite, TypeScript y Supabase Realtime (broadcast y presence). No usa tablas de base de datos.
 
-Rutas:
+Rutas (nadie las tiene que escribir a mano, salen de la pantalla de inicio):
 
-- `/` inicio (entrar como jugador o abrir la sala de admin)
-- `/admin` pantalla grande para el proyector
+- `/` inicio: **Join as player**, **Host a game (big screen)** y **I'm the host**
+- `/admin` proyector (la autoridad del juego)
 - `/play` celular de cada jugador
+- `/host` celular del host (moderador, no juega)
 
-## Guía rápida para el presentador
+## Guía del presentador (unos 27 minutos)
 
-La actividad completa cabe en unos 18 minutos con 6 o 7 personas. El juego en sí dura unos 11 minutos y el resto es entrar a la sala y discutir.
+### Antes de empezar
 
-| Momento | Qué hago | Duración aprox. |
+1. En la compu del proyector abro la app y toco **Host a game (big screen)**. Sale la pantalla "Red flags vs Green flags" con el código de sala.
+2. En mi celular abro la app y toco **I'm the host**. Escribo el código de sala y la contraseña de host:
+   - Si definí `VITE_HOST_PASSWORD` (en `.env` o en Vercel), uso esa.
+   - Si no, en la esquina de abajo a la derecha del proyector hay un botón pequeño **Show host PIN**. Lo toco, veo el PIN de 4 dígitos por 6 segundos y se esconde solo.
+3. Listo: en el proyector aparece "🎤 Host". Si mi celular recarga o se bloquea, vuelvo a la vista de host sin escribir nada. **Leave host** cierra la sesión.
+
+En mi celular arriba veo el reloj de la actividad, en qué parte vamos y si voy "On time" o atrasado según el plan. Faltando 3 minutos para los 30 sale un aviso rojo. Debajo está el **guion**: lo que digo (Say) y una pregunta para hacer (Ask). Las preguntas usan nombres y tarjetas reales de la partida; con ◀ ▶ veo otra y con **Shuffle** cambio por una de otra persona. **Hide script** lo esconde si solo quiero los botones.
+
+### Paso a paso
+
+| Parte | Qué hago | Tiempo |
 | --- | --- | --- |
-| Lobby | Abro `/admin` en el proyector. Todos entran a la URL con el código, arman su personaje y eligen su frase de "dating profile". Mientras tanto leemos en voz alta algunos perfiles. Cuando todos dicen Ready, toco **Start game**. | 3 a 4 min |
-| Tutorial | Sale solo en el proyector y en los celulares. Se puede saltar con **Skip tutorial**. | 20 s |
-| Ronda 1 "First Date" | Tarjetas con su color, caen lento. No hago nada. | 1:15 + defensa |
-| Defensa | La primera red flag después del segundo 10 pausa a todos. La persona tiene 20 s para defenderse en inglés (el proyector le da una frase para arrancar) y los demás votan 10 s. **Start vote** y **Close vote** adelantan el tiempo. Después hay 10 s y el juego sigue solo. | 45 s |
-| Resultados | Ranking, "Red flag of the round" y una pregunta para comentar. Hay 1 minuto de discusión y 10 s de cuenta regresiva. **Hold timer** lo pausa si la conversación está buena; **Round 2 now** la corta. | 1:10 |
-| Ronda 2 "Getting Serious" | La mitad de las tarjetas caen grises: hay que leerlas. | 1:15 + defensa |
-| Resultados | Igual que antes. | 1:10 |
-| Ronda 3 "Meet the Parents" | Todas grises, más rápido y los puntos valen doble. | 1:15 + defensa |
-| Resultados + premios | Discusión de la última ronda y después los 5 premios, uno por uno. | 1:40 |
-| Podio | Los 3 primeros y las estadísticas para cerrar la discusión. **Play again** vuelve al lobby. | 1 min |
+| Intro | El guion trae mis puntos: qué es una red flag, qué es una green flag y cómo se juega. Mientras hablo, la gente ya puede entrar. Toco **Open the lobby**. | 2 min |
+| Lobby | Todos entran con el código, arman su personaje y eligen su frase de dating profile. El guion me da preguntas sobre esas frases ("Ana, your profile says..."). Cuando están listos: **Start game**. | 4 min |
+| Tutorial | Sale solo, 20 s. Puedo saltarlo. | 0:20 |
+| Ronda 1 "First Date" | Tarjetas con color. La primera red flag después del segundo 10 pausa todo para la defensa. | ~2 min |
+| Defensa | La persona tiene 20 s para defenderse en inglés. **Objection!** suma 10 s con sonido y animación. **Go to the vote** pasa a la votación cuando yo quiera (10 s). El guion trae 3 preguntas de seguimiento sobre esa tarjeta. | ~45 s |
+| Resultados | Ranking por 15 s y después empieza solo el Hot Take. | 0:15 |
+| Hot Take 1 | Situación ambigua. Todos votan en secreto RED o GREEN (15 s). Se revelan los dos lados con porcentajes. Toco un nombre de cada lado para darle la palabra (30 s cada uno), después **Host's verdict** y doy mi opinión. **Next round** cuando quiera: el Hot Take no avanza solo. Si voy atrasado, **Skip Hot Take**. | ~3 min |
+| Ronda 2 "Getting Serious" | La mitad de las tarjetas caen grises. | ~2 min |
+| Hot Take 2 | Igual que el primero, con otra situación. | ~3 min |
+| Ronda 3 "Meet the Parents" | Todo gris, más rápido y puntos dobles. | ~2 min |
+| Resultados y premios | Most Toxic, Master Manipulator, Best Lawyer, Victim of the Night, The Ick Collector. | ~1 min |
+| Podio | Los 3 primeros. Toco **Final thoughts**. | 1 min |
+| Final thoughts | El proyector muestra la red flag más atrapada, la green más ignorada, el Hot Take más dividido y el jugador más tóxico. El guion me da 3 datos curiosos con la frase lista para decirlos. | ~3 min |
 
-En la barra del proyector están el reloj de la actividad (cuenta desde que se creó la sala), "Round X of 3", los botones de música y efectos de sonido, y **New room** por si hay que empezar de cero con otro código. Si alguien recarga el celular o el proyector, vuelve a la misma sala con su personaje y sus puntos.
+Total planeado: unos 25 minutos más margen. El plan exacto (para el aviso de atraso) está en `PLAN`, en `src/lib/game.ts`. Si la clase se alarga, puedo saltar un Hot Take o bajar las rondas a 60 s (`durationMs`).
 
-La música arranca cuando se toca cualquier botón del proyector (los navegadores no dejan reproducir sonido antes). Baja sola durante las defensas y la discusión para que se escuche a la persona.
+El proyector también tiene todos los botones, por si el host no está conectado.
 
 ## Reglas
 
+- **Tarjetas**: pequeñas, con máximo 5 palabras. Cuando alguien atrapa una, la frase completa aparece grande 1 segundo en su celular y en su pantalla del proyector. Caen en filas de 1 o 2 tarjetas, siempre con un hueco para esquivar.
 - **Green flag** atrapada: +100. Cada green seguida sube el combo (x1, x1.5, x2, x3). Una red lo reinicia.
 - **Red flag** atrapada: −75 y se pierde un corazón.
 - **Green que se deja pasar**: −25.
-- **Corazones**: 5 por partida. Con 0 quedás "Heartbroken" 10 segundos (no podés atrapar nada) y volvés con 1 corazón y la mitad del combo. Nadie queda fuera.
+- **Corazones**: 5 por partida. Con 0 quedás "Heartbroken" 10 segundos y volvés con 1 corazón y la mitad del combo.
 - **Soulmate** (dorada, máximo 2 por ronda): +300 y recupera un corazón.
 - **The Ick** (morada): no suma ni resta, solo dispara "THE ICK!" en el proyector y cuenta para el premio.
-- **Poderes**: Gaslighting (controles invertidos), Ghosting (tarjetas casi invisibles), Love bombing (todo se ve verde), Mixed signals (todo cae más rápido) y The ex is back (congelado). Duran 5 s y se mandan a otra persona. **Therapy** es un escudo para uno mismo que bloquea el próximo sabotaje.
-- **Dash**: doble toque en una flecha o deslizar rápido el dedo sobre el juego. Tiene 1,2 s de espera.
-- **Defensa**: una por ronda. Si gana "Convinced" (o hay empate) recupera el corazón y los puntos de esa red flag. Si no, pierde 100 puntos más.
-- **Premios**: Most Toxic (más reds), Master Manipulator (más sabotajes enviados), Best Lawyer (más votos Convinced), Victim of the Night (más sabotajes recibidos) y The Ick Collector.
+- **Poderes**: Gaslighting, Ghosting, Love bombing, Mixed signals y The ex is back duran 5 s y se mandan a otra persona. **Therapy** es un escudo que bloquea el próximo sabotaje.
+- **Dash**: doble toque en una flecha o deslizar rápido el dedo. Tiene 1,2 s de espera.
+- **Defensa**: una por ronda. Si gana "Convinced" (o hay empate) recupera el corazón y los puntos; si no, pierde 100 puntos más.
 
-Todos los tiempos y puntajes están en `src/lib/game.ts`, en la parte de arriba. Si la actividad se alarga se puede bajar `durationMs` de las rondas o `DISCUSSION_MS`. Las frases de las tarjetas están en `src/data/cards.ts` y las de los perfiles en `src/data/profiles.ts`.
+## Qué se puede editar
+
+- `src/lib/game.ts`: todos los tiempos, puntajes, velocidades, tamaño de las tarjetas y el plan de 27 minutos.
+- `src/data/cards.ts`: tarjetas (`short` es lo que cae, máximo 5 palabras; `full` es la frase completa), Hot Takes, Icks y Soulmates.
+- `src/data/host.ts`: el guion del host. Las plantillas usan `{player}`, `{card}`, `{count}`, `{other}`, `{pct}`, etc. Una pregunta solo aparece si todos sus huecos se pueden llenar, así que nunca sale un `{player}` en pantalla.
+- `src/data/profiles.ts`: frases de dating profile.
+
+## Variables de entorno
+
+| Variable | Para qué |
+| --- | --- |
+| `VITE_SUPABASE_URL` | URL del proyecto de Supabase |
+| `VITE_SUPABASE_ANON_KEY` | anon key del proyecto |
+| `VITE_HOST_PASSWORD` | contraseña del host. Si está vacía, el proyector genera un PIN de 4 dígitos al crear la sala. |
+| `VITE_LOCAL_REALTIME` | solo para pruebas en una compu sin Supabase (`1`). No ponerla en Vercel. |
+
+La contraseña no viaja por la red: el celular del host manda una prueba calculada con ella y el proyector le responde con un token cifrado. Los comandos del host van por un canal privado y llevan ese token; el proyector ignora cualquier comando sin token válido, así que un jugador no puede controlar el juego aunque conozca el código. Ojo: como es una variable `VITE_`, queda dentro del código de la página, así que es para una clase, no para algo de alta seguridad.
 
 ## Correrlo en local
 
@@ -56,45 +86,40 @@ cp .env.example .env     # en Windows: copy .env.example .env
 npm run dev
 ```
 
-En `.env` van la URL y la anon key de Supabase (ver abajo). Después se abre `http://localhost:5173/admin` en la compu y `http://localhost:5173/play` en otra pestaña.
-
-### Probar con celulares en la misma wifi
+### Celulares en la misma wifi
 
 ```bash
 npm run dev -- --host
 ```
 
-Vite muestra una línea `Network: http://192.168.x.x:5173`. El proyector abre `/admin` y los celulares entran a `http://192.168.x.x:5173/play`. Si Windows pregunta por el firewall, hay que permitir redes privadas. Inclinar el teléfono en iPhone solo funciona con HTTPS, o sea en Vercel; en local se usan los botones.
+Vite muestra una línea `Network: http://192.168.x.x:5173`. El proyector abre esa dirección, toca **Host a game** y los celulares entran a la misma dirección. Si Windows pregunta por el firewall, hay que permitir redes privadas. Inclinar el teléfono en iPhone solo funciona con HTTPS (en Vercel).
 
-### Probar sin Supabase y con 7 jugadores falsos
+### Probar sin Supabase con 7 bots y el host
 
-Con esta línea en `.env` (o en `.env.local`), las pestañas del mismo navegador se comunican sin internet:
+Con `VITE_LOCAL_REALTIME=1` en `.env` (o `.env.local`), abrí:
 
 ```
-VITE_LOCAL_REALTIME=1
+http://localhost:5173/dev/bots?room=ABCD&n=7&admin=1&host=1
 ```
 
-Para simular la clase completa abrí `http://localhost:5173/dev/bots?room=ABCD&n=7&admin=1`. Esa página muestra el proyector arriba y 7 bots que juegan solos abajo, todo en la misma pestaña. El código de sala tiene que ser el mismo que muestra el admin (o tocar **New room** y cambiar `room=` en la URL). Esta página solo existe con `npm run dev`; no se incluye en el build de producción.
+Arriba se ve el proyector y el celular del host (que entra solo con la contraseña o el PIN), y abajo 7 bots que juegan, votan y mandan sabotajes. El código `room=` tiene que ser el que muestra el proyector. Esta página solo existe con `npm run dev`.
 
-Para probar a mano con varios jugadores en un navegador se agrega `&pid=` a la URL: `/play?room=ABCD&pid=2`, `/play?room=ABCD&pid=3`, etc.
+Para probar a mano varios jugadores en un navegador: `/play?room=ABCD&pid=2`, `/play?room=ABCD&pid=3`, etc.
 
 ## Crear el proyecto en Supabase
 
-1. Entrar a https://supabase.com, crear una cuenta y luego un proyecto nuevo (el plan gratis alcanza).
-2. Esperar a que el proyecto termine de crearse.
-3. Ir a Project Settings > API (en algunas versiones del panel aparece como "Data API" o en el botón "Connect").
-4. Copiar el "Project URL" en `VITE_SUPABASE_URL`.
-5. Copiar la clave "anon public" (también puede aparecer como "publishable key") en `VITE_SUPABASE_ANON_KEY`.
+1. Entrar a https://supabase.com, crear una cuenta y un proyecto nuevo (el plan gratis alcanza).
+2. Ir a Project Settings > API (o al botón "Connect").
+3. Copiar el "Project URL" en `VITE_SUPABASE_URL` y la clave "anon public" (o "publishable key") en `VITE_SUPABASE_ANON_KEY`.
 
-No hay que crear tablas. Realtime viene activado por defecto; si en Realtime > Settings existe la opción de permitir solo canales privados, tiene que quedar desactivada.
+No hay que crear tablas. Si en Realtime > Settings existe la opción de permitir solo canales privados, tiene que quedar desactivada.
 
-El plan gratis permite 100 mensajes por segundo. Cada celular manda unas 7 actualizaciones por segundo y solo al admin (por su propio canal), así que 7 jugadores usan unos 50 por segundo. Los efectos del proyector salen de esos mismos mensajes.
+El plan gratis permite 100 mensajes por segundo. Cada celular manda unas 7 actualizaciones por segundo y solo al proyector, así que 7 jugadores usan unos 50 por segundo. El host manda muy pocos mensajes.
 
 ## Desplegar en Vercel
 
-1. Subir el repo a GitHub.
-2. En https://vercel.com, "Add New > Project" e importar el repo. Vercel detecta Vite solo (build `npm run build`, carpeta `dist`).
-3. Antes de darle Deploy, en "Environment Variables" agregar `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`. No agregar `VITE_LOCAL_REALTIME` en Vercel.
-4. Deploy. El archivo `vercel.json` ya redirige todas las rutas a `index.html`, entonces `/admin` y `/play` funcionan al recargar.
+1. En https://vercel.com, "Add New > Project" e importar el repo `green-and-red-flags`.
+2. Antes de darle Deploy, en "Environment Variables" agregar `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y, si quiero contraseña fija, `VITE_HOST_PASSWORD`.
+3. Deploy. `vercel.json` ya redirige todas las rutas a `index.html`.
 
-Si se cambian las variables después, hay que hacer "Redeploy" para que se apliquen, porque Vite las mete en el build.
+Si cambio las variables después, hay que hacer "Redeploy".
