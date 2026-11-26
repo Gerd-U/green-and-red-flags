@@ -224,6 +224,7 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
   const [info, setInfo] = useState<HostInfo | null>(null)
   const [received, setReceived] = useState(0)
   const [showScript, setShowScript] = useState(true)
+  const [menu, setMenu] = useState(false)
   const [, force] = useState(0)
   const roomRef = useRef<Room | null>(null)
   // a tap on "Start hosting" is needed: Chrome on Android only lets a page
@@ -374,209 +375,217 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
 
   // plain render helper (not a component), so the buttons keep the same DOM
   // node between the 2 refreshes per second and a tap is never lost
-  const btn = (cmd: HostCmdName, children: ReactNode, kind: 'green' | 'red' | 'ghost' | 'gold' = 'ghost', wide = false) => (
-    <button key={cmd} className={`btn btn-${kind} host-btn ${wide ? 'wide' : ''}`} onClick={() => send(cmd)}>
+  const btn = (cmd: HostCmdName, children: ReactNode, kind: 'green' | 'red' | 'ghost' | 'gold' = 'ghost') => (
+    <button key={cmd + String(children)} className={`btn btn-${kind} host-btn2`} onClick={() => send(cmd)}>
       {children}
     </button>
   )
 
+  // ---- the big "Next" button: always the next logical step ----
+  let next: { cmd: HostCmdName; label: string } | { cmd: null; label: string } = { cmd: null, label: '' }
+  switch (s.phase) {
+    case 'intro':
+      next = { cmd: 'openLobby', label: 'Open the lobby' }
+      break
+    case 'lobby':
+      next = { cmd: 'start', label: `Start the game (${ready}/${playersOnline.length} ready)` }
+      break
+    case 'tutorial':
+      next = { cmd: 'skip', label: 'Skip the tutorial' }
+      break
+    case 'playing':
+      next = { cmd: null, label: s.running ? 'Round in progress…' : 'Paused' }
+      break
+    case 'defense':
+      next =
+        d?.stage === 'talk'
+          ? { cmd: 'vote', label: 'Start vote' }
+          : d?.stage === 'vote'
+            ? { cmd: 'skip', label: 'Close the vote' }
+            : { cmd: 'skip', label: 'Back to the game' }
+      break
+    case 'roundEnd':
+      next = { cmd: 'skip', label: s.auto?.label ? `${s.auto.label} now` : 'Continue' }
+      break
+    case 'hotTake':
+      next =
+        h?.stage === 'vote'
+          ? { cmd: 'htReveal', label: 'Reveal the votes' }
+          : h?.stage === 'verdict'
+            ? { cmd: 'htNext', label: 'Next round' }
+            : { cmd: 'htVerdict', label: "Host's verdict" }
+      break
+    case 'awards':
+      next = { cmd: 'podium', label: 'Podium' }
+      break
+    case 'podium':
+      next = { cmd: 'final', label: 'Final thoughts' }
+      break
+    case 'final':
+      next = { cmd: null, label: 'The end 🎉' }
+      break
+  }
+
+  // ---- one line of status under the script ----
+  let line = ''
+  if (s.phase === 'lobby' || s.phase === 'intro') line = `${ready} of ${playersOnline.length} ready${s.lobbyLeft ? ` · starting soon ${formatClock(s.lobbyLeft - since + 999)}` : ''}`
+  if (s.phase === 'playing') line = `${roundConfig(s.round).name} · ${left(roundConfig(s.round).durationMs - s.elapsed + (s.running ? 0 : since))}s`
+  if (s.phase === 'defense' && d)
+    line = `${d.name}: “${d.text}” · ${d.stage === 'talk' ? `talking ${left(d.remaining)}s` : d.stage === 'vote' ? `votes ${d.votesIn}/${d.votesNeeded} · ${left(d.remaining)}s` : `${d.result === 'convinced' ? 'Convinced' : 'Not convinced'} ${d.convinced}–${d.notConvinced}`}`
+  if (s.phase === 'roundEnd' && s.auto) line = `${s.auto.label} in ${left(s.auto.remaining)}s${s.auto.paused ? ' (held)' : ''}`
+  if (s.phase === 'hotTake' && h)
+    line =
+      h.stage === 'vote'
+        ? `🔥 “${h.text}” · votes ${h.votesIn}/${h.votesNeeded} · ${left(h.remaining)}s`
+        : `🔥 RED ${h.pctRed}% · GREEN ${100 - (h.pctRed ?? 0)}%${h.stage === 'speaker' ? ` · ${nameOf(h.speaker)} talks: ${left(h.remaining)}s` : ''}`
+
   const b = cues.banner
   return (
-    <div className="screen host-screen">
+    <div className="host-app">
       <PolyBackground variant="dark" />
       {cues.flash && <div key={cues.flash.n} className={`cue-flash cue-${cues.flash.kind}`} aria-hidden="true" />}
       {!connected && <div className="cue-disconnected">⚠️ Disconnected — reconnecting…</div>}
-      <div className="host-wrap">
-        {b && (
-          <div className={`cue-banner cue-${b.kind}`} key={b.key} role="alert">
-            <div className="cue-head">
-              {CUE_STYLE[b.kind].icon} {CUE_STYLE[b.kind].label} — {b.text}
-            </div>
-            {b.kind === 'speak' && question && <div className="cue-question">“{question}”</div>}
-            <button className="btn cue-ok" onClick={cues.dismiss}>
-              Got it
-            </button>
+      {b && (
+        <div className={`cue-banner cue-${b.kind}`} key={b.key} role="alert">
+          <div className="cue-head">
+            {CUE_STYLE[b.kind].icon} {CUE_STYLE[b.kind].label} — {b.text}
           </div>
-        )}
-        <header className="host-top">
-          <div>
-            <div className="host-phase">{phaseLabel(s)}</div>
-            <div className="host-sub">
-              Room {session.code} · {playersOnline.length} players
-            </div>
-          </div>
-          <div className="host-clock-box">
-            <div className={`host-clock ${over ? 'late' : ''}`}>⏱ {formatClock(activity)}</div>
-            <div className={`host-plan ${behindMs > 30_000 ? 'late' : 'ok'}`}>
-              {behindMs > 30_000 ? `${formatClock(behindMs)} behind` : 'On time'}
-            </div>
-          </div>
-        </header>
-        {over && <div className="host-warning">⚠️ {formatClock(ACTIVITY_LIMIT_MIN * 60_000 - activity)} left of the 30 minutes. Wrap up!</div>}
-
-        <div className="host-script-toggle">
-          <button className="btn btn-ghost small" onClick={() => setShowScript((v) => !v)}>
-            {showScript ? 'Hide script' : 'Show script'}
+          {b.kind === 'speak' && question && <div className="cue-question">“{question}”</div>}
+          <button className="btn cue-ok" onClick={cues.dismiss}>
+            Got it
           </button>
         </div>
-        {/* stays mounted when hidden, so the cue banner can show the current question */}
-        <div hidden={!showScript}>
-          <HostScript info={info} onQuestion={setQuestion} />
-        </div>
+      )}
 
-        {/* ---------- controls per phase ---------- */}
-        <section className="host-controls">
-          {s.phase === 'intro' && (
-            <>{btn('openLobby', <>Open the lobby ▶</>, 'green', true)}</>
-          )}
-          {s.phase === 'lobby' && (
-            <>
-              <div className="host-status">
-                {ready} of {playersOnline.length} ready
-              </div>
-              <>{btn('start', <>Start game ▶</>, 'green', true)}</>
-            </>
-          )}
-          {s.phase === 'tutorial' && (
-            <>{btn('skip', <>Skip tutorial ⏭</>, 'green', true)}</>
-          )}
-          {s.phase === 'playing' && (
-            <>
-              <div className="host-status">{s.running ? `${roundConfig(s.round).name}: playing` : 'Paused'}</div>
-              <>{btn('pause', <>{s.running ? '⏸ Pause' : '▶ Resume'}</>, s.running ? 'ghost' : 'green')}</>
-              <>{btn('endRound', <>End round</>, 'ghost')}</>
-            </>
-          )}
-          {s.phase === 'defense' && d && (
-            <>
-              <div className="host-status">
-                {d.name} defends “{d.text}”
-                <br />
-                {d.stage === 'talk' && `Talking: ${left(d.remaining)}s`}
-                {d.stage === 'vote' && `Voting: ${d.votesIn}/${d.votesNeeded} · ${left(d.remaining)}s`}
-                {d.stage === 'result' && `${d.result === 'convinced' ? 'Convinced' : 'Not convinced'} (${d.convinced}–${d.notConvinced})`}
-              </div>
-              {d.stage === 'talk' && (
-                <>
-                  <>{btn('objection', <>⚖️ OBJECTION! (+10 s)</>, 'gold', true)}</>
-                  <>{btn('vote', <>Go to the vote ⏭</>, 'green', true)}</>
-                </>
-              )}
-              {d.stage === 'vote' && (
-                <>{btn('skip', <>Close the vote ⏭</>, 'green', true)}</>
-              )}
-              {d.stage === 'result' && (
-                <>
-                  <>{btn('pause', <>{s.auto?.paused ? '▶ Resume timer' : '⏸ Hold'}</>, 'ghost')}</>
-                  <>{btn('skip', <>Continue ▶</>, 'green')}</>
-                </>
-              )}
-            </>
-          )}
-          {s.phase === 'roundEnd' && (
-            <>
-              <div className="host-status">
-                {s.auto ? `${s.auto.label} in ${left(s.auto.remaining)}s${s.auto.paused ? ' (held)' : ''}` : 'Results'}
-              </div>
-              <>{btn('pause', <>{s.auto?.paused ? '▶ Resume timer' : '⏸ Hold'}</>, 'ghost')}</>
-              <>{btn('skip', <>{s.auto?.label ?? 'Next'} now ▶</>, 'green')}</>
-            </>
-          )}
-          {s.phase === 'hotTake' && h && (
-            <>
-              <div className="host-status">
-                🔥 “{h.text}”
-                <br />
-                {h.stage === 'vote' && `Secret vote: ${h.votesIn}/${h.votesNeeded} · ${left(h.remaining)}s`}
-                {h.stage !== 'vote' && `RED ${h.pctRed}% · GREEN ${100 - (h.pctRed ?? 0)}%`}
-                {h.stage === 'speaker' && ` · ${nameOf(h.speaker)} talks: ${left(h.remaining)}s`}
-              </div>
-              {h.stage === 'vote' ? (
-                <>
-                  <>{btn('htReveal', <>Reveal now</>, 'green', true)}</>
-                  <>{btn('htNext', <>Skip Hot Take (we are late) ⏭</>, 'ghost', true)}</>
-                </>
-              ) : (
-                <>
-                  <div className="ht-sides">
-                    {(['red', 'green'] as const).map((side) => (
-                      <div key={side} className={`ht-side ${side}`}>
-                        <div className="ht-side-title">{side === 'red' ? 'RED' : 'GREEN'}</div>
-                        {(h[side] ?? []).map((id) => {
-                          const p = info.players.find((x) => x.id === id)
-                          return (
-                            <button key={id} className={`ht-pick ${h.speaker === id ? 'on' : ''}`} onClick={() => send('htSpeaker', id)}>
-                              {p && <Avatar config={p.avatar} size={30} crop="head" animate={false} />}
-                              <span>{p?.name ?? '?'}</span>
-                            </button>
-                          )
-                        })}
-                        {!(h[side] ?? []).length && <div className="muted small">nobody</div>}
-                      </div>
-                    ))}
-                  </div>
-                  <div className="muted small center-text">Tap a name to give them the word (30 s)</div>
-                  <>{btn('htVerdict', <>👑 Host&apos;s verdict</>, 'gold', true)}</>
-                  <>{btn('htNext', <>Next round ▶</>, 'green', true)}</>
-                </>
-              )}
-            </>
-          )}
-          {s.phase === 'awards' && (
-            <>{btn('podium', <>Podium now ▶</>, 'green', true)}</>
-          )}
-          {s.phase === 'podium' && (
-            <>{btn('final', <>Final thoughts ▶</>, 'green', true)}</>
-          )}
-          {(s.phase === 'podium' || s.phase === 'final') && <>{btn('playAgain', <>Play again</>, 'ghost')}</>}
-          {(s.phase === 'roundEnd' || s.phase === 'hotTake') && s.round >= TOTAL_ROUNDS && (
-            <>{btn('awards', <>Go to awards</>, 'ghost')}</>
-          )}
-        </section>
-
-        <section className="cue-panel">
-          {!wakeOk && <div className="cue-wake">💡 Keep your screen on during the activity (this browser can't do it automatically).</div>}
-          {cues.history.length > 0 && (
-            <div className="cue-history">
-              <div className="label">Last cues</div>
-              {cues.history.map((c) => (
-                <div key={c.key} className={`cue-hist cue-${c.kind}`}>
-                  <span>{CUE_STYLE[c.kind].icon}</span> {c.text}
-                  <span className="cue-time">{new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="cue-switches">
-            {(
-              [
-                ['vibration', 'Vibration'],
-                ['flash', 'Flash'],
-                ['sound', 'Cue sound'],
-              ] as const
-            ).map(([k, label]) => (
-              <label key={k} className="cue-switch">
-                <input type="checkbox" checked={cues.prefs[k]} onChange={(e) => cues.updatePrefs({ [k]: e.target.checked })} />
-                <span>{label}</span>
-              </label>
-            ))}
-            <button className="btn btn-ghost small" onClick={cues.testCues}>
-              Test cue
-            </button>
+      <header className="host-top">
+        <div className="host-top-left">
+          <div className="host-phase">{phaseLabel(s)}</div>
+          <div className="host-sub">
+            Room {session.code} · {playersOnline.length} players
           </div>
-        </section>
+        </div>
+        <div className="host-clock-box">
+          <div className={`host-clock ${over ? 'late' : ''}`}>⏱ {formatClock(activity)}</div>
+          <div className={`host-plan ${behindMs > 30_000 ? 'late' : 'ok'}`}>
+            {behindMs > 30_000 ? `${formatClock(behindMs)} behind` : 'On time'}
+          </div>
+        </div>
+        <button className="host-gear" onClick={() => setMenu(true)} aria-label="Settings">
+          ⚙️
+        </button>
+      </header>
+      {over && <div className="host-warning">⚠️ {formatClock(ACTIVITY_LIMIT_MIN * 60_000 - activity)} left of the 30 minutes. Wrap up!</div>}
 
-        <footer className="host-footer">
-          <button
-            className="btn btn-ghost small"
-            onClick={() => {
-              if (window.confirm('Leave host mode on this phone?')) onLeave()
-            }}
-          >
-            Leave host
-          </button>
-        </footer>
+      {/* teleprompter (stays mounted when hidden: the cue banner uses its question) */}
+      <div className="host-script-area" hidden={!showScript}>
+        <HostScript info={info} onQuestion={setQuestion} />
       </div>
+      {!showScript && <div className="host-script-hidden">Script hidden · ⚙️ to show it</div>}
+
+      {line && <div className="host-status1">{line}</div>}
+
+      {s.phase === 'hotTake' && h && h.stage !== 'vote' && (
+        <div className="ht-sides">
+          {(['red', 'green'] as const).map((side) => (
+            <div key={side} className={`ht-side ${side}`}>
+              <div className="ht-side-title">
+                {side === 'red' ? 'RED' : 'GREEN'} · tap to give the word
+              </div>
+              <div className="ht-chips">
+                {(h[side] ?? []).map((id) => {
+                  const p = info.players.find((x) => x.id === id)
+                  return (
+                    <button key={id} className={`ht-pick ${h.speaker === id ? 'on' : ''}`} onClick={() => send('htSpeaker', id)}>
+                      {p && <Avatar config={p.avatar} size={24} crop="head" animate={false} />}
+                      <span>{p?.name ?? '?'}</span>
+                    </button>
+                  )
+                })}
+                {!(h[side] ?? []).length && <span className="muted small">nobody</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button className="host-next" disabled={!next.cmd} onClick={() => next.cmd && send(next.cmd)}>
+        <span className="host-next-label">{next.cmd ? 'Next' : ''}</span>
+        <span className="host-next-what">
+          {next.label}
+          {next.cmd ? ' ▶' : ''}
+        </span>
+      </button>
+
+      <div className="host-row2">
+        {(s.phase === 'intro' || s.phase === 'lobby') && btn('lobbyTimer', s.lobbyLeft ? '⏱ Stop countdown' : '⏱ Starting soon')}
+        {s.phase === 'playing' && (
+          <>
+            {btn('pause', s.running ? '⏸ Pause' : '▶ Resume', s.running ? 'ghost' : 'green')}
+            {btn('endRound', 'End round')}
+          </>
+        )}
+        {s.phase === 'defense' && d?.stage === 'talk' && btn('objection', '⚖️ Objection! +10s', 'gold')}
+        {s.phase === 'defense' && d?.stage === 'result' && btn('pause', s.auto?.paused ? '▶ Resume timer' : '⏸ Hold')}
+        {s.phase === 'roundEnd' && btn('pause', s.auto?.paused ? '▶ Resume timer' : '⏸ Hold')}
+        {s.phase === 'hotTake' && h?.stage !== 'verdict' && btn('htNext', 'Skip Hot Take ⏭')}
+        {(s.phase === 'roundEnd' || s.phase === 'hotTake') && s.round >= TOTAL_ROUNDS && btn('awards', 'Go to awards')}
+        {(s.phase === 'podium' || s.phase === 'final') && btn('playAgain', 'Play again')}
+      </div>
+
+      {/* ---------- settings menu ---------- */}
+      {menu && (
+        <div className="host-menu" role="dialog" aria-label="Settings">
+          <div className="host-menu-card">
+            <div className="host-menu-head">
+              <strong>Settings</strong>
+              <button className="btn btn-ghost small" onClick={() => setMenu(false)}>
+                Close ✕
+              </button>
+            </div>
+            <div className="cue-switches">
+              {(
+                [
+                  ['vibration', 'Vibration'],
+                  ['flash', 'Flash'],
+                  ['sound', 'Cue sound'],
+                ] as const
+              ).map(([k, label]) => (
+                <label key={k} className="cue-switch">
+                  <input type="checkbox" checked={cues.prefs[k]} onChange={(e) => cues.updatePrefs({ [k]: e.target.checked })} />
+                  <span>{label}</span>
+                </label>
+              ))}
+              <label className="cue-switch">
+                <input type="checkbox" checked={showScript} onChange={(e) => setShowScript(e.target.checked)} />
+                <span>Show script</span>
+              </label>
+            </div>
+            <button className="btn btn-ghost" onClick={cues.testCues}>
+              Test cue (SPEAK, ACT, WARN)
+            </button>
+            {!wakeOk && <div className="cue-wake">💡 Keep your screen on during the activity (this browser can't do it automatically).</div>}
+            {cues.history.length > 0 && (
+              <div className="cue-history">
+                <div className="label">Last cues</div>
+                {cues.history.map((c) => (
+                  <div key={c.key} className={`cue-hist cue-${c.kind}`}>
+                    <span>{CUE_STYLE[c.kind].icon}</span> {c.text}
+                    <span className="cue-time">{new Date(c.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              className="btn btn-red"
+              onClick={() => {
+                if (window.confirm('Leave host mode on this phone?')) onLeave()
+              }}
+            >
+              Leave host
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

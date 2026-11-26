@@ -41,6 +41,8 @@ export interface CueCtx {
   planKey: string
   activityMs: number
   connected: boolean
+  /** "Starting soon" countdown in the lobby (ms left, interpolated) */
+  lobbyLeft?: number | null
   /** ms that everyone in the lobby (2+ people) has been ready without changes */
   readyStableMs?: number
 }
@@ -118,6 +120,12 @@ export const CUES: CueDef[] = [
     when: (p, c) => (p !== null && c.phase === 'lobby' && (c.readyStableMs ?? 0) >= 4000 ? `ready-${c.online}` : null),
   },
   {
+    id: 'lobbyTimerDone',
+    kind: 'act',
+    text: () => 'Countdown over: start the game',
+    when: (p, c) => (p && (p.lobbyLeft ?? 0) > 0 && c.lobbyLeft !== null && c.lobbyLeft !== undefined && c.lobbyLeft <= 0 ? `lobbyTimer-${c.activityMs >> 15}` : null),
+  },
+  {
     id: 'round5',
     kind: 'act',
     text: () => '5 seconds left in the round',
@@ -173,5 +181,6 @@ export function cueContext(info: HostInfo, since: number, connected: boolean, pl
     planKey,
     activityMs,
     connected,
+    lobbyLeft: s.lobbyLeft == null ? null : s.lobbyLeft - since,
   }
 }

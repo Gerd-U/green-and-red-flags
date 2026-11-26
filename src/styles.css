@@ -4004,3 +4004,176 @@ html.host-page .screen {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
+/* ---------- host v5: one screen, big Next button ---------- */
+.host-app {
+  position: relative;
+  isolation: isolate;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  overflow: hidden;
+}
+.host-app .host-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.host-top-left {
+  min-width: 0;
+}
+.host-app .host-phase {
+  font-size: clamp(16px, 4.8vw, 20px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.host-app .host-clock {
+  font-size: clamp(16px, 5vw, 22px);
+}
+.host-gear {
+  border: 0;
+  background: #ffffff14;
+  color: #fff;
+  font-size: 22px;
+  width: 44px;
+  height: 44px;
+}
+.host-script-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.host-script-area[hidden] {
+  display: none;
+}
+.host-script-area .host-script {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.host-script-hidden {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-weight: 700;
+}
+.host-app .hs-say p {
+  font-size: clamp(16px, 4.8vw, 20px);
+}
+.host-app .hs-question {
+  font-size: clamp(19px, 5.8vw, 24px);
+}
+.host-status1 {
+  font-weight: 700;
+  font-size: clamp(14px, 4vw, 16px);
+  background: #ffffff10;
+  padding: 6px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.host-app .ht-sides {
+  max-height: 26dvh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+.ht-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.host-app .ht-pick {
+  font-size: 15px;
+  padding: 4px 8px;
+}
+.host-app .ht-side-title {
+  font-size: 12px;
+}
+.host-next {
+  flex-shrink: 0;
+  border: 0;
+  min-height: clamp(70px, 11dvh, 96px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #06210f;
+  background: linear-gradient(135deg, #2ee06d, var(--green) 50%, var(--green-2));
+  clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  font-weight: 800;
+  box-shadow: 0 8px 24px #000a;
+}
+.host-next:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.host-next:disabled {
+  background: #ffffff1a;
+  color: var(--muted);
+}
+.host-next-label {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.host-next-what {
+  font-size: clamp(20px, 6.4vw, 28px);
+  line-height: 1.1;
+  text-align: center;
+  padding: 0 10px;
+}
+.host-row2 {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 0;
+}
+.host-row2:empty {
+  display: none;
+}
+.host-btn2 {
+  flex: 1 1 0;
+  min-width: 30%;
+  font-size: clamp(14px, 4.2vw, 16px);
+  padding: 10px 8px;
+}
+.host-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  background: #0009;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.host-menu-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: #1d1533;
+  padding: 14px 14px max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: slideUp 0.2s ease-out;
+}
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+}
+.host-menu-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+}

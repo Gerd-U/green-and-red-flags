@@ -946,7 +946,7 @@ export function useAdminGame(code: string) {
       const reply: HostAuthMsg = { nonce: m.nonce, ok }
       if (ok) {
         const token = randomHex(32)
-        g.current.hostTokens = [...g.current.hostTokens.slice(-4), token]
+        g.current.hostTokens = [...g.current.hostTokens.slice(-9), token]
         listenToHost(token)
         reply.enc = xorToken(token, pw, m.nonce)
         persist(true)
