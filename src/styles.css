@@ -4194,3 +4194,38 @@ html.host-page .screen {
   height: 180px;
   border: 0;
 }
+
+/* phone overlays (round results, votes...): never cut on short screens, scroll instead */
+.overlay {
+  justify-content: safe center;
+  overflow-y: auto;
+  padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+}
+.round-end-phone svg {
+  height: clamp(80px, 18dvh, 150px);
+  width: auto;
+  flex-shrink: 0;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .round-end-phone {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 18px;
+    align-content: safe center;
+    justify-content: center;
+  }
+  .round-end-phone > * {
+    grid-column: 2;
+  }
+  .round-end-phone > svg {
+    grid-column: 1;
+    grid-row: 1 / 5;
+    align-self: center;
+    height: 50dvh;
+  }
+  .round-end-phone .big-score {
+    font-size: 30px;
+    margin: 2px 0;
+  }
+}

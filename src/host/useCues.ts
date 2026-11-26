@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { buzz } from '../lib/buzz'
 import { cueDing, unlockAudio } from '../lib/sfx'
 import { load, save } from '../lib/storage'
 import type { HostInfo } from '../lib/types'
@@ -23,13 +24,6 @@ export interface CuePrefs {
 const PREFS_KEY = 'gr.cuePrefs'
 const PRIORITY: Record<CueKind, number> = { warn: 3, speak: 2, act: 1 }
 
-function vibrate(pattern: number[]) {
-  try {
-    navigator.vibrate?.(pattern)
-  } catch {
-    /* not supported (iPhone, desktop): the flash and banner still work */
-  }
-}
 
 /**
  * Watches the host info and fires each cue of CUES once, at the right moment.
@@ -58,7 +52,7 @@ export function useCues(info: HostInfo | null, receivedAt: number, connected: bo
   const signal = useCallback((kind: CueKind, delay = 0) => {
     window.setTimeout(() => {
       const pf = prefsRef.current
-      if (pf.vibration) vibrate(CUE_STYLE[kind].vibrate)
+      if (pf.vibration) buzz(CUE_STYLE[kind].vibrate)
       if (pf.flash) setFlash({ kind, n: Date.now() })
       if (pf.sound) cueDing(kind)
     }, delay)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
+import { buzz } from '../lib/buzz'
 import Avatar from '../components/Avatar'
 import RoundBackdrop from '../components/RoundBackdrop'
 import { POWERS } from '../data/cards'
@@ -176,11 +177,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
     s.effects = s.effects.filter((e) => e.power !== sabotage.power)
     s.effects.push({ power: sabotage.power, until: t + SABOTAGE_MS })
     fb({ type: 'sabotaged', from: sabotage.from, power: sabotage.power })
-    try {
-      navigator.vibrate?.([80, 60, 80])
-    } catch {
-      /* ignore */
-    }
+    buzz([80, 60, 80])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sabotage, me, round])
 
@@ -407,11 +404,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
               s.hbUntil = Math.max(game, 0) + HEARTBROKEN_MS
             }
             fb({ type: 'red', broke })
-            try {
-              navigator.vibrate?.(150)
-            } catch {
-              /* ignore */
-            }
+            buzz(150)
           } else if (c.kind === 'soulmate') {
             s.score += SOULMATE_POINTS * pm
             s.hearts = Math.min(START_HEARTS, s.hearts + 1)
