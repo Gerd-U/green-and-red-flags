@@ -9,6 +9,7 @@ import PolyBackground from './components/PolyBackground'
 
 // dev-only page with 7 bot players (not included in production builds)
 const DevBots = import.meta.env.DEV ? lazy(() => import('./pages/DevBots')) : null
+const DevPhones = import.meta.env.DEV ? lazy(() => import('./pages/DevPhones')) : null
 
 function MissingConfig() {
   return (
@@ -33,6 +34,16 @@ export default function App() {
       <Route path="/admin" element={<Admin />} />
       <Route path="/play" element={<Play />} />
       <Route path="/host" element={<Host />} />
+      {DevPhones && (
+        <Route
+          path="/dev/phones"
+          element={
+            <Suspense fallback={null}>
+              <DevPhones />
+            </Suspense>
+          }
+        />
+      )}
       {DevBots && (
         <Route
           path="/dev/bots"
