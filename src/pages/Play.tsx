@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Avatar from '../components/Avatar'
 import PolyBackground from '../components/PolyBackground'
-import Tutorial from '../components/Tutorial'
 import { POWERS } from '../data/cards'
 import { randomProfileLine, sanitizeProfileLine } from '../data/profiles'
 import { randomAvatar, sanitizeAvatar } from '../lib/avatar'
@@ -24,6 +23,7 @@ import type {
 } from '../lib/types'
 import Editor from '../player/Editor'
 import PlayerGame, { type GameFeedback } from '../player/PlayerGame'
+import PhoneTutorial from '../player/PhoneTutorial'
 
 interface Profile {
   name: string
@@ -544,7 +544,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
           onFeedback={onFeedback}
         />
       ) : phase === 'tutorial' ? (
-        <Tutorial secondsLeft={Math.ceil(tutorialLeft / 1000)} compact />
+        <PhoneTutorial avatar={avatar} msLeft={tutorialLeft} />
       ) : (
         <div className="wait-view">
           <div className="wait-top">

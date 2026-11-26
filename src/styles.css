@@ -3772,3 +3772,83 @@ html.host-page .screen {
   0%, 20% { transform: rotate(-90deg); }
   60%, 100% { transform: rotate(0deg); }
 }
+
+/* ---------- phone tutorial (practice) ---------- */
+.ptut {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.ptut-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  /* room for the sound button in the top right corner */
+  padding: 10px 58px 4px 14px;
+}
+.ptut-dots {
+  display: flex;
+  gap: 8px;
+}
+.ptut-dots span {
+  width: 14px;
+  height: 14px;
+  background: #ffffff33;
+  transform: rotate(45deg);
+}
+.ptut-dots span.done {
+  background: var(--green-2);
+}
+.ptut-dots span.on {
+  background: var(--yellow);
+  transform: rotate(45deg) scale(1.25);
+}
+.ptut-time {
+  font-weight: 800;
+  font-size: clamp(18px, 5.5vw, 24px);
+  color: var(--yellow);
+  min-width: 2.5ch;
+  text-align: right;
+}
+.ptut-title {
+  margin: 4px 14px 6px;
+  font-size: clamp(24px, 8.4vw, 38px);
+  line-height: 1.05;
+  font-weight: 800;
+  animation: popIn 0.35s ease-out;
+}
+.ptut-title.k-green { color: #4ade80; }
+.ptut-title.k-red { color: #ff6b84; }
+.ptut-title.k-grey { color: #d6d1e4; }
+.ptut-field {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff08, #ffffff00 70%);
+  touch-action: none;
+}
+.ptut-msg {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  transform: translate(-50%, -50%);
+  font-size: clamp(20px, 6.4vw, 28px);
+  font-weight: 800;
+  background: #1b1030e6;
+  padding: 8px 14px;
+  white-space: nowrap;
+  animation: popIn 0.25s ease-out;
+}
+.ptut-note {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 700;
+  white-space: nowrap;
+}
