@@ -14,6 +14,7 @@ import {
   HOTTAKE_AFTER_ROUNDS,
   HOTTAKE_SPEAKER_MS,
   HOTTAKE_VOTE_MS,
+  LOBBY_COUNTDOWN_MS,
   MAX_STREAK_LEVEL,
   OBJECTION_MS,
   RED_PENALTY,
@@ -133,6 +134,8 @@ export interface AdminGame {
   hotTakesDone: ScriptData['hotTakes']
   auto: AdminAuto | null
   tutorialEndsAt: number
+  /** "Starting soon" countdown in the lobby (0 = off) */
+  lobbyEndsAt: number
   last10Round: number
   summary?: RoundSummary
   awards?: Award[]
@@ -153,7 +156,7 @@ export interface AdminGame {
   seq: number
 }
 
-type Snapshot = Omit<AdminGame, 'defense' | 'hotTake' | 'clockAt' | 'running' | 'seq' | 'auto' | 'tutorialEndsAt'> & {
+type Snapshot = Omit<AdminGame, 'defense' | 'hotTake' | 'clockAt' | 'running' | 'seq' | 'auto' | 'tutorialEndsAt' | 'lobbyEndsAt'> & {
   code: string
   savedAt: number
 }
@@ -183,6 +186,7 @@ function freshGame(keep?: Pick<AdminGame, 'createdAt' | 'players' | 'hostTokens'
     hotTakesDone: [],
     auto: null,
     tutorialEndsAt: 0,
+    lobbyEndsAt: 0,
     last10Round: 0,
     players: keep?.players ?? {},
     counters: emptyCounters(),
@@ -289,7 +293,7 @@ export function useAdminGame(code: string) {
       lastSave.current = now
       const s = g.current
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { defense: _d, hotTake: _h, clockAt: _c, running: _r, seq: _s, auto: _a, tutorialEndsAt: _t, ...rest } = s
+      const { defense: _d, hotTake: _h, clockAt: _c, running: _r, seq: _s, auto: _a, tutorialEndsAt: _t, lobbyEndsAt: _l, ...rest } = s
       const snap: Snapshot = {
         ...rest,
         code,
@@ -323,6 +327,7 @@ export function useAdminGame(code: string) {
       stats: s.stats,
       finalStats: s.finalStats,
       tutorialLeft: s.phase === 'tutorial' ? Math.max(0, s.tutorialEndsAt - now) : undefined,
+      lobbyLeft: (s.phase === 'lobby' || s.phase === 'intro') && s.lobbyEndsAt ? Math.max(0, s.lobbyEndsAt - now) : null,
       auto: s.auto
         ? { label: s.auto.label, paused: s.auto.paused, remaining: s.auto.paused ? s.auto.pausedLeft : Math.max(0, s.auto.endsAt - now) }
         : null,
@@ -373,7 +378,7 @@ export function useAdminGame(code: string) {
       const info: HostInfo = {
         state,
         activityMs: Date.now() - s.createdAt,
-        players: Object.values(s.players).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, bio: p.bio, online: p.online, ready: p.ready })),
+        players: Object.values(s.players).map((p) => ({ id: p.id, name: p.name, avatar: p.avatar, bio: p.bio, online: p.online, ready: p.ready, bot: p.bot })),
         script: {
           roundRed: toList(s.roundRed),
           roundMiss: toList(s.roundMiss),
@@ -432,6 +437,13 @@ export function useAdminGame(code: string) {
     const s = g.current
     if (s.phase !== 'intro') return
     s.phase = 'lobby'
+    commit()
+  }
+
+  /** host/admin toggle: start or stop the "Starting soon" countdown */
+  const lobbyTimer = () => {
+    const s = g.current
+    s.lobbyEndsAt = s.lobbyEndsAt ? 0 : performance.now() + LOBBY_COUNTDOWN_MS
     commit()
   }
 
@@ -840,6 +852,8 @@ export function useAdminGame(code: string) {
     switch (c.cmd) {
       case 'openLobby':
         return openLobby()
+      case 'lobbyTimer':
+        return lobbyTimer()
       case 'start':
         return g.current.phase === 'intro' ? openLobby() : startGame()
       case 'pause':
@@ -953,6 +967,7 @@ export function useAdminGame(code: string) {
           avatar: sanitizeAvatar(m.avatar),
           bio: sanitizeProfileLine(m.bio),
           ready: Boolean(m.ready),
+          bot: Boolean(m.bot),
           online: true,
         }
         listenToPlayer(m.id)
@@ -1056,6 +1071,7 @@ export function useAdminGame(code: string) {
     elapsed,
     actions: {
       openLobby,
+      lobbyTimer,
       startGame,
       startRound,
       togglePause,

@@ -3936,3 +3936,71 @@ html.host-page .screen {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+
+/* ---------- projector v5 ---------- */
+/* the floating controls sit above the bottom strip (never over the QR / code) */
+.proj-controls {
+  bottom: calc(var(--edge-y, 4vh) + 9vh);
+}
+.bot-tag {
+  display: inline-block;
+  margin-left: 0.4em;
+  padding: 0 0.35em;
+  font-size: 0.7em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  vertical-align: middle;
+  color: #1b1030;
+  background: #67e8f9;
+}
+.lp-top .bot-tag {
+  margin-left: 0;
+  font-size: 1em;
+}
+.proj .lobby-countdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4vh;
+  background: #1b1030cc;
+  padding: 1vh 1.4vw;
+  font-weight: 800;
+}
+.proj .lobby-countdown span {
+  font-size: var(--fs-s);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.proj .lobby-countdown b {
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+.proj .lobby-countdown.soon b {
+  color: var(--yellow);
+  animation: pulse 0.5s ease-in-out infinite alternate;
+}
+/* lowest card of each mini screen: its text, readable */
+.mcap {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  transform: translateY(-50%);
+  z-index: 2;
+  padding: 0.15em 0.4em;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 3px 0 #0006;
+}
+.proj .mcap {
+  font-size: var(--fs-s);
+}
+.mcap {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}

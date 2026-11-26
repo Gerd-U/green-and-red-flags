@@ -177,6 +177,8 @@ export interface GameState {
   auto: AutoAdvance | null
   /** ms left in the tutorial */
   tutorialLeft?: number
+  /** "Starting soon" countdown in the lobby (ms left), null when off */
+  lobbyLeft?: number | null
   summary?: RoundSummary
   awards?: Award[]
   stats?: PodiumStats
@@ -307,6 +309,7 @@ export interface HostPlayer {
   name: string
   avatar: AvatarConfig
   bio: string
+  bot?: boolean
   online: boolean
   ready: boolean
 }

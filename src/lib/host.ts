@@ -99,6 +99,7 @@ export interface HostAuthMsg {
 
 export type HostCmdName =
   | 'openLobby'
+  | 'lobbyTimer'
   | 'start'
   | 'pause'
   | 'skip'

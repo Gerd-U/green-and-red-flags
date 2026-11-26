@@ -76,7 +76,10 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
               <span className="mini-face">
                 <Avatar config={p.avatar} crop="head" size={30} animate={false} />
               </span>
-              <span className="mini-name">{p.name}</span>
+              <span className="mini-name">
+                {p.name}
+                {p.bot && <span className="bot-tag">BOT</span>}
+              </span>
               <span className="mini-score">{Math.round(scores[p.id] ?? 0)}</span>
               <span className="mini-lives">
                 {Array.from({ length: START_HEARTS }, (_, i) => (
@@ -106,6 +109,18 @@ export default function LiveGrid({ players, ticks, catchFx, scores, seed, round,
                   </div>
                 )
               })}
+              {(() => {
+                // the lowest card's short text, big enough to read on the projector
+                const low = view?.cards.filter((c) => c.k !== 'p').sort((a, b) => b.y - a.y)[0]
+                const sc = low ? schedule[low.id] : undefined
+                if (!low || !sc?.text) return null
+                const look = low.h ? 'grey' : { g: 'green', r: 'red', p: 'power', i: 'ick', s: 'soulmate' }[low.k]
+                return (
+                  <div className={`mcap m-${look}`} style={{ top: `${low.y * 100}%` }}>
+                    {sc.text}
+                  </div>
+                )
+              })()}
               <div
                 className="mini-char"
                 style={{ left: `${(view?.x ?? 0.5) * 100}%`, top: `${PLAYER_Y * 100}%`, width: `${PLAYER_W * 120}%` }}

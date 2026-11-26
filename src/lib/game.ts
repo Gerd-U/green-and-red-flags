@@ -79,6 +79,8 @@ export const roundConfig = (round: number) => ROUNDS[Math.max(0, Math.min(TOTAL_
 
 // ---- flow ----
 export const TUTORIAL_MS = 20_000
+/** "Starting soon" countdown the host can run in the lobby */
+export const LOBBY_COUNTDOWN_MS = 60_000
 export const COUNTDOWN_MS = 3_000
 /** the round's defense can only start after this moment */
 export const DEFENSE_AFTER_MS = 10_000

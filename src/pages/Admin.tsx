@@ -222,7 +222,13 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
           <IntroScreen code={code} joinUrl={shortUrl} players={lobbyPlayers.length} qr={<QRCode text={joinUrl} className="qr-big" />} />
         )}
         {game.phase === 'lobby' && (
-          <Lobby players={lobbyPlayers} code={code} joinUrl={shortUrl} qr={<QRCode text={joinUrl} className="qr-big" />} />
+          <Lobby
+            players={lobbyPlayers}
+            code={code}
+            joinUrl={shortUrl}
+            qr={<QRCode text={joinUrl} className="qr-big" />}
+            countdown={game.lobbyEndsAt ? Math.max(0, game.lobbyEndsAt - now) : null}
+          />
         )}
         {game.phase === 'tutorial' && <Tutorial secondsLeft={Math.ceil(Math.max(0, game.tutorialEndsAt - now) / 1000)} />}
         {inRound && (
@@ -290,6 +296,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
         {hostOnline && <div className="proj-controls-note">Host connected · press H to show</div>}
         <div className="proj-controls-row">
           {game.phase === 'intro' && b('Open lobby ▶', actions.openLobby, 'green')}
+          {(game.phase === 'intro' || game.phase === 'lobby') && b(game.lobbyEndsAt ? '⏱ Stop countdown' : '⏱ Starting soon', actions.lobbyTimer)}
           {game.phase === 'lobby' && b('Start game ▶', actions.startGame, 'green', readyCount === 0)}
           {game.phase === 'tutorial' && b('Skip tutorial ⏭', actions.skip, 'green')}
           {game.phase === 'playing' && (

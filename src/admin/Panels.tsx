@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, roundConfig, TOTAL_ROUNDS } from '../lib/game'
+import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, roundConfig, TOTAL_ROUNDS } from '../lib/game'
 import type { Award, PlayerInfo, PodiumStats, RoundSummary, SabotageEvent } from '../lib/types'
 import type { AdminGame, Announcement } from './useAdminGame'
 
@@ -27,6 +27,7 @@ export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: 
           <Avatar config={r.player.avatar} size={compact ? 34 : 44} crop="head" animate={false} />
           <span className="rank-name">
             {r.player.name}
+            {r.player.bot && <span className="bot-tag">BOT</span>}
             <span className="rank-hearts">{'♥'.repeat(Math.max(0, r.hearts))}</span>
           </span>
           {r.streak >= 2 && <span className="rank-combo">🔥{r.streak}</span>}
@@ -37,7 +38,7 @@ export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: 
   )
 }
 
-export function Lobby({ players, code, joinUrl, qr }: { players: PlayerInfo[]; code: string; joinUrl: string; qr: ReactNode }) {
+export function Lobby({ players, code, joinUrl, qr, countdown }: { players: PlayerInfo[]; code: string; joinUrl: string; qr: ReactNode; countdown: number | null }) {
   const ready = players.filter((p) => p.ready).length
   return (
     <div className="lobby">
@@ -47,11 +48,17 @@ export function Lobby({ players, code, joinUrl, qr }: { players: PlayerInfo[]; c
         <div className="join-url">{joinUrl}</div>
         <div className="join-code">{code}</div>
         <div className="join-count">{players.length === 0 ? 'Waiting for players…' : `${ready} of ${players.length} ready`}</div>
+        {countdown !== null && (
+          <div className={`lobby-countdown ${countdown <= 10_000 ? 'soon' : ''}`}>
+            <span>{countdown > 0 ? 'Starting soon' : 'Starting now!'}</span>
+            {countdown > 0 && <b>{formatClock(countdown + 999)}</b>}
+          </div>
+        )}
       </div>
       <div className={`lobby-players n-${Math.min(players.length, 8)}`}>
         {players.map((p) => (
           <div key={p.id} className={`lobby-player ${p.ready ? 'ready' : ''}`}>
-            <div className="lp-top">♥ Dating profile</div>
+            <div className="lp-top">{p.bot ? <span className="bot-tag">BOT</span> : '♥ Dating profile'}</div>
             <div className="lp-avatar">
               <Avatar config={p.avatar} size={110} pose={p.ready ? 'dance' : 'idle'} />
             </div>
