@@ -4177,3 +4177,20 @@ html.host-page .screen {
   align-items: center;
   font-size: 18px;
 }
+
+/* projector demo bots: tiny frames in a corner, nearly invisible */
+.demo-bots {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  display: flex;
+  gap: 2px;
+  opacity: 0.02;
+  pointer-events: none;
+  z-index: 1;
+}
+.demo-bots iframe {
+  width: 90px;
+  height: 180px;
+  border: 0;
+}

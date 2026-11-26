@@ -36,7 +36,7 @@ interface Profile {
 type Step = 'join' | 'editor' | 'room'
 
 const NAME_MAX = 12
-const DEMO_NAMES = ['Mia', 'Leo', 'Zoe', 'Max', 'Ivy', 'Sam', 'Noa', 'Kai', 'Lu', 'Rio', 'Ana', 'Teo']
+export const DEMO_NAMES = ['Mia', 'Leo', 'Zoe', 'Max', 'Ivy', 'Sam', 'Noa', 'Kai', 'Lu', 'Rio', 'Ana', 'Teo']
 const pickDemoName = () => DEMO_NAMES[Math.floor(Math.random() * DEMO_NAMES.length)]
 
 /**
@@ -84,7 +84,7 @@ export default function Play() {
   const urlRoom = normalizeCode(params.get('room'))
   const [room, setRoom] = useState(urlRoom || saved?.room || '')
   const [name, setName] = useState(
-    saved?.name ?? (bot ? (demo ? pickDemoName() : `Bot ${slot.replace(/\D/g, '')}`) : '')
+    saved?.name ?? (bot ? (demo ? (params.get('name') ?? '').trim().slice(0, NAME_MAX) || pickDemoName() : `Bot ${slot.replace(/\D/g, '')}`) : '')
   )
   // came from the QR / a link with ?room=: the code is fixed ("Not your room?" unlocks it)
   const [editRoom, setEditRoom] = useState(!urlRoom)

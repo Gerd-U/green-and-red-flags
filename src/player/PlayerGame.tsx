@@ -85,7 +85,7 @@ interface Props {
   sabotage: SabotageEvent | null
   grant: GrantEvent | null
   tilt: boolean
-  /** dev-only autopilot */
+  /** autopilot (dev bots and the projector's demo bots) */
   bot?: boolean
   onTick: (t: Tick) => void
   onCatch: (m: CatchMsg) => void

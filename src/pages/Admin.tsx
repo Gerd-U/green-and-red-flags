@@ -6,6 +6,7 @@ import RoundBackdrop from '../components/RoundBackdrop'
 import Tutorial from '../components/Tutorial'
 import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, roundConfig, START_HEARTS, TOTAL_ROUNDS } from '../lib/game'
 import { makeRoomCode } from '../lib/room'
+import { DEMO_NAMES } from './Play'
 import { duckMusic, isMusicOn, isSfxOn, playSfx, setMusicOn, setMusicTempo, setSfxOn, startMusic, stopMusic, unlockAudio } from '../lib/sfx'
 import LiveGrid from '../admin/LiveGrid'
 import { Announcer, AwardsShow, DefenseView, Lobby, Podium, Ranking, RoundResults, SabotageAnim, type RankRow } from '../admin/Panels'
@@ -94,6 +95,22 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
   // ---- sound ----
   const [musicOn, setMusic] = useState(isMusicOn())
   const [sfxOn, setSfx] = useState(isSfxOn())
+  // demo mode: bot players running in tiny iframes of this page (same bot code as /dev/bots)
+  const [demoBots, setDemoBots] = useState<{ pid: string; name: string }[]>([])
+  const addDemoBots = () =>
+    setDemoBots((list) => {
+      const stamp = Date.now().toString(36).slice(-4)
+      // 3 different names that aren't taken by the bots already playing
+      const free = DEMO_NAMES.filter((n) => !list.some((b) => b.name === n)).sort(() => Math.random() - 0.5)
+      return [...list, ...[1, 2, 3].map((i) => ({ pid: `demo${stamp}${i}`, name: free[i - 1] ?? '' }))].slice(-9)
+    })
+  const removeDemoBots = () => {
+    // forget their saved profiles (also from earlier demos) so the next ones get new names and looks
+    Object.keys(localStorage)
+      .filter((k) => /^gr\.\w+\.demo\w+$/.test(k))
+      .forEach((k) => localStorage.removeItem(k))
+    setDemoBots([])
+  }
   useEffect(() => {
     const unlock = () => {
       unlockAudio()
@@ -347,9 +364,21 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
             },
             sfxOn ? 'ghost' : 'ghost off'
           )}
+          {b(demoBots.length >= 9 ? 'Demo: 9 bots max' : 'Demo: add 3 bots', addDemoBots, 'ghost', demoBots.length >= 9)}
+          {demoBots.length > 0 && b(`Remove bots (${demoBots.length})`, removeDemoBots)}
           {b('New room…', confirmNewRoom)}
         </div>
       </div>
+
+      {/* the demo bots: real players in tiny, almost invisible frames (kept inside the
+          viewport so the browser doesn't pause their animation loop) */}
+      {demoBots.length > 0 && (
+        <div className="demo-bots" aria-hidden="true">
+          {demoBots.map(({ pid, name }) => (
+            <iframe key={pid} title={pid} tabIndex={-1} src={`/play?room=${code}&pid=${pid}&bot=1&demo=1&name=${encodeURIComponent(name)}`} />
+          ))}
+        </div>
+      )}
 
       <PhaseTransition phaseKey={`${game.phase}-${game.round}`} />
     </div>
