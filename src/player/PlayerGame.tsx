@@ -663,9 +663,18 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
         >
           ◀
         </button>
-        <div className={`dash-dot ${dashReady ? 'ready' : ''}`} title="Double tap to dash">
-          ⚡
-        </div>
+        <button
+          className={`dash-btn ${dashReady ? 'ready' : ''}`}
+          onPointerDown={(e) => {
+            e.preventDefault()
+            dash(sim.current.facing)
+          }}
+          onContextMenu={(e) => e.preventDefault()}
+          aria-label="Dash (quick jump to the side you are facing)"
+        >
+          <span className="dash-icon">⚡</span>
+          <span className="dash-label">Dash</span>
+        </button>
         <button
           className="ctrl-btn"
           onPointerDown={press('right', true)}

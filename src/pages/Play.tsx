@@ -268,6 +268,9 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
   const mainRef = useRef<Room | null>(null)
   const mineRef = useRef<Room | null>(null)
   const lastSeq = useRef(-1)
+  const lastStateAt = useRef(0)
+  const [reconnects, setReconnects] = useState(0)
+  const lastReconnect = useRef(0)
 
   const playersRef = useRef(players)
   playersRef.current = players
@@ -302,6 +305,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
     mineRef.current = mine
 
     main.on<GameState>('state', (s) => {
+      lastStateAt.current = performance.now()
       if (s.seq < lastSeq.current && s.seq > 2) return
       lastSeq.current = s.seq
       setState(s)
@@ -339,7 +343,21 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
       mine.close()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, me])
+  }, [code, me, reconnects])
+
+  // watchdog: no news from the projector for 8 s -> reopen the channels
+  useEffect(() => {
+    const id = setInterval(() => {
+      const now = performance.now()
+      const quiet = lastStateAt.current > 0 && now - lastStateAt.current > 8000
+      const down = status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'
+      if ((quiet || down) && now - lastReconnect.current > 8000) {
+        lastReconnect.current = now
+        setReconnects((n) => n + 1)
+      }
+    }, 2000)
+    return () => clearInterval(id)
+  }, [status])
 
   // keep presence up to date
   useEffect(() => {
@@ -747,6 +765,13 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
               {state.auto.label} in {Math.ceil(autoLeft / 1000)}s
             </div>
           )}
+        </div>
+      )}
+
+      {/* only after we were connected once (the first connection shows "Connecting...") */}
+      {lastStateAt.current > 0 && (status !== 'SUBSCRIBED' || performance.now() - lastStateAt.current > 5000) && (
+        <div className="reconnecting" role="status">
+          <span className="spinner" aria-hidden="true" /> Reconnecting…
         </div>
       )}
 

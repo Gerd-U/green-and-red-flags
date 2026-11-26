@@ -3852,3 +3852,87 @@ html.host-page .screen {
   font-weight: 700;
   white-space: nowrap;
 }
+
+/* ---------- in-game (phone) ---------- */
+.fcard {
+  animation: cardIn 0.25s ease-out;
+}
+@keyframes cardIn {
+  from { opacity: 0; }
+}
+.hud {
+  padding: 6px max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
+}
+.hud-score strong {
+  font-size: clamp(20px, 6.5vw, 28px);
+}
+.hud-time {
+  font-size: clamp(22px, 7vw, 30px);
+}
+.controls {
+  grid-template-columns: 1fr clamp(64px, 20vw, 92px) 1fr;
+  gap: clamp(8px, 2.5vw, 14px);
+  height: clamp(92px, 17dvh, 150px);
+  padding: 10px max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+}
+.ctrl-btn {
+  font-size: clamp(34px, 11vw, 48px);
+}
+.dash-btn {
+  height: 100%;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: #ffffff12;
+  color: var(--muted);
+  font-weight: 800;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%);
+  transition: background 0.2s, color 0.2s;
+}
+.dash-btn.ready {
+  background: linear-gradient(160deg, #ffe680, var(--yellow));
+  color: var(--ink);
+}
+.dash-btn:active {
+  transform: scale(0.94);
+}
+.dash-icon {
+  font-size: clamp(22px, 7vw, 30px);
+  line-height: 1;
+}
+.dash-label {
+  font-size: clamp(13px, 3.8vw, 16px);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.reconnecting {
+  position: fixed;
+  left: 50%;
+  top: calc(8px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--red);
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  padding: 8px 14px;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px #000a;
+}
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #ffffff66;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

@@ -43,33 +43,33 @@ export const ROUNDS: RoundConfig[] = [
   {
     name: 'First Date',
     durationMs: 75_000,
-    fallMs: [4600, 3900],
+    fallMs: [5300, 4500],
     greyRatio: 0,
     sabotageFromMs: 15_000,
     pointsMult: 1,
-    pairChance: 0.3,
+    pairChance: 0.35,
     theme: 'restaurant',
     tagline: 'Every card shows its true color. Take it easy!',
   },
   {
     name: 'Getting Serious',
     durationMs: 75_000,
-    fallMs: [4200, 3500],
+    fallMs: [4900, 4100],
     greyRatio: 0.5,
     sabotageFromMs: 5_000,
     pointsMult: 1,
-    pairChance: 0.4,
+    pairChance: 0.45,
     theme: 'apartment',
     tagline: 'Half the cards are grey. Read before you catch!',
   },
   {
     name: 'Meet the Parents',
     durationMs: 75_000,
-    fallMs: [3800, 3100],
+    fallMs: [4500, 3700],
     greyRatio: 1,
     sabotageFromMs: 5_000,
     pointsMult: 2,
-    pairChance: 0.5,
+    pairChance: 0.55,
     theme: 'dining',
     tagline: 'All cards are grey, faster, and points count double!',
   },
@@ -146,13 +146,14 @@ export const DASH_COOLDOWN_MS = 1200
 // ---- field geometry (normalized: x by width, y by height) ----
 export const CARD_W = 0.31
 export const CARD_H = 0.09
-export const PLAYER_Y = 0.85
+export const PLAYER_Y = 0.82
 /** width of the avatar box; the drawn body is ~50% of it (measured in the DOM) */
-export const PLAYER_W = 0.2
+export const PLAYER_W = 0.25
 export const PLAYER_BODY_W = PLAYER_W * 0.5
 /** from the top of the hair to the feet (normalized to the field height) */
 export const PLAYER_H = 0.16
-export const SPAWN_Y = -0.08
+/** cards start already visible at the top (the upper half never looks empty) */
+export const SPAWN_Y = 0.02
 /**
  * Horizontal distance (card center to player center) that counts as a catch:
  * the card and the drawn body must really overlap (minus a 1% grace margin),
