@@ -56,10 +56,15 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
     setBio(line)
     onChange?.(avatar, line)
   }
+  /** tapping the bubble swaps the line for another one */
+  const nextBio = () => {
+    const i = PROFILE_LINES.indexOf(bio)
+    pickBio(PROFILE_LINES[(i + 1 + Math.floor(Math.random() * (PROFILE_LINES.length - 1))) % PROFILE_LINES.length])
+  }
 
-  // thumbnails: the current character with one part swapped
+  // thumbnails: the current character with one part swapped (3-column grid)
   const thumbs = <K extends keyof AvatarConfig>(key: K, options: readonly AvatarConfig[K][], crop: 'head' | 'full') => (
-    <div className="thumb-row">
+    <div className="thumb-grid">
       {options.map((opt) => {
         const cfg = { ...avatar, [key]: opt }
         return (
@@ -68,6 +73,7 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
             className={`thumb ${avatar[key] === opt ? 'active' : ''} ${crop}`}
             onClick={() => set(key, opt)}
             aria-label={pretty(String(opt))}
+            aria-pressed={avatar[key] === opt}
           >
             <Avatar config={cfg} size={crop === 'head' ? 52 : 46} crop={crop} animate={false} />
             <span>{pretty(String(opt))}</span>
@@ -78,7 +84,7 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
   )
 
   const swatches = (key: 'skin' | 'hairColor' | 'topColor' | 'bottomColor', colors: string[]) => (
-    <div className="swatch-row">
+    <div className="swatch-grid">
       {colors.map((c) => (
         <button
           key={c}
@@ -86,6 +92,7 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
           style={{ background: c }}
           onClick={() => set(key, c)}
           aria-label={`${key} ${c}`}
+          aria-pressed={avatar[key] === c}
         />
       ))}
     </div>
@@ -100,18 +107,35 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
 
   return (
     <div className="editor">
-      <div className="editor-head">
-        <span className="chip">Build your character</span>
-        <strong className="editor-name">{name}</strong>
+      <div className="editor-quick">
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            const a = randomAvatar()
+            setAvatar(a)
+            setPose('dance')
+            onChange?.(a, bio)
+          }}
+        >
+          🎲 Random
+        </button>
+        <button className="btn btn-green" onClick={() => onReady(avatar, bio)}>
+          Looks good! ✓
+        </button>
       </div>
 
-      <button className="editor-preview" onClick={() => setPose('dance')} aria-label="Preview (tap to dance)">
-        <div className="preview-stage">
+      <div className="editor-preview">
+        <button className="preview-stage" onClick={() => setPose('dance')} aria-label="Your character (tap to dance)">
           <Avatar config={avatar} size={128} pose={pose} />
-          <div className="preview-shadow" />
+          <span className="preview-shadow" />
+        </button>
+        <div className="preview-side">
+          <strong className="editor-name">{name}</strong>
+          <button className="preview-bio" onClick={nextBio} aria-label="Change your dating profile line">
+            “{bio}”<span className="bio-hint">tap to change ↻</span>
+          </button>
         </div>
-        <div className="preview-bio">“{bio}”</div>
-      </button>
+      </div>
 
       <div className="tabs" role="tablist">
         {TABS.map((t) => (
@@ -137,8 +161,8 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
         )}
         {tab === 'hair' && (
           <>
-            {section('Hairstyle', thumbs('hair', HAIRS, 'head'))}
             {section('Hair color', swatches('hairColor', HAIR_COLORS))}
+            {section('Hairstyle', thumbs('hair', HAIRS, 'head'))}
           </>
         )}
         {tab === 'clothes' && (
@@ -152,9 +176,8 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
         )}
         {tab === 'extras' && (
           <>
-            {section('Accessory', thumbs('accessory', ACCESSORIES, 'full'))}
             {section(
-              'Dating profile',
+              'Dating profile (tap one)',
               <div className="bio-list">
                 {PROFILE_LINES.map((line) => (
                   <button key={line} className={`bio ${bio === line ? 'active' : ''}`} onClick={() => pickBio(line)}>
@@ -163,25 +186,9 @@ export default function Editor({ name, initial, initialBio, onReady, onChange }:
                 ))}
               </div>
             )}
+            {section('Accessory', thumbs('accessory', ACCESSORIES, 'full'))}
           </>
         )}
-      </div>
-
-      <div className="editor-actions">
-        <button
-          className="btn btn-ghost"
-          onClick={() => {
-            const a = randomAvatar()
-            setAvatar(a)
-            setPose('dance')
-            onChange?.(a, bio)
-          }}
-        >
-          🎲 Random
-        </button>
-        <button className="btn btn-green btn-big" onClick={() => onReady(avatar, bio)}>
-          Ready!
-        </button>
       </div>
     </div>
   )

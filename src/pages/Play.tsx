@@ -35,6 +35,27 @@ interface Profile {
 
 type Step = 'join' | 'editor' | 'room'
 
+const NAME_MAX = 12
+const DEMO_NAMES = ['Mia', 'Leo', 'Zoe', 'Max', 'Ivy', 'Sam', 'Noa', 'Kai', 'Lu', 'Rio', 'Ana', 'Teo']
+const pickDemoName = () => DEMO_NAMES[Math.floor(Math.random() * DEMO_NAMES.length)]
+
+/**
+ * Two players can't have the same name: if somebody who joined earlier
+ * (smaller id) already uses mine, I take the next free number ("Ana2").
+ */
+export function uniqueName(name: string, me: string, others: { id: string; name: string }[]): string {
+  const base = name.trim().slice(0, NAME_MAX) || 'Player'
+  const taken = new Set(others.filter((o) => o.id !== me).map((o) => o.name.toLowerCase()))
+  const clash = others.some((o) => o.id < me && o.name.toLowerCase() === base.toLowerCase())
+  if (!clash) return base
+  for (let n = 2; n < 100; n++) {
+    const suffix = String(n)
+    const candidate = base.slice(0, NAME_MAX - suffix.length) + suffix
+    if (!taken.has(candidate.toLowerCase())) return candidate
+  }
+  return base
+}
+
 function useLockedScreen() {
   useEffect(() => {
     document.documentElement.classList.add('lock')
@@ -54,14 +75,19 @@ export default function Play() {
   const nav = useNavigate()
   const [params] = useSearchParams()
   const slot = params.get('pid') ? `.${params.get('pid')}` : ''
-  // dev-only bot player (used by /dev/bots to simulate a full class)
-  const bot = import.meta.env.DEV && params.get('bot') === '1'
+  // bot player: used by /dev/bots and by the projector's demo mode (works in production too)
+  const bot = params.get('bot') === '1'
+  const demo = params.get('demo') === '1'
   const me = useMemo(() => getPlayerId(slot), [slot])
   const saved = useMemo(() => load<Profile | null>('gr.profile' + slot, null), [slot])
 
   const urlRoom = normalizeCode(params.get('room'))
   const [room, setRoom] = useState(urlRoom || saved?.room || '')
-  const [name, setName] = useState(saved?.name ?? (bot ? `Bot ${slot.replace(/\D/g, '')}` : ''))
+  const [name, setName] = useState(
+    saved?.name ?? (bot ? (demo ? pickDemoName() : `Bot ${slot.replace(/\D/g, '')}`) : '')
+  )
+  // came from the QR / a link with ?room=: the code is fixed ("Not your room?" unlocks it)
+  const [editRoom, setEditRoom] = useState(!urlRoom)
   // sanitizeAvatar turns old (polygon) saves into a new random person
   const [avatar, setAvatar] = useState<AvatarConfig>(() => (saved?.avatar ? sanitizeAvatar(saved.avatar) : randomAvatar()))
   const [bio, setBio] = useState<string>(() => (saved?.bio ? sanitizeProfileLine(saved.bio) : randomProfileLine()))
@@ -81,7 +107,7 @@ export default function Play() {
   const submitJoin = (e: FormEvent) => {
     e.preventDefault()
     const c = normalizeCode(room)
-    const n = name.trim().slice(0, 14)
+    const n = name.trim().slice(0, NAME_MAX)
     if (c.length !== 4 || !n) return
     setRoom(c)
     setName(n)
@@ -95,19 +121,33 @@ export default function Play() {
         <PolyBackground />
         <form className="panel join-panel" onSubmit={submitJoin}>
           <h1 className="title-sm">Join the game</h1>
-          <label className="label" htmlFor="room">
-            Room code
-          </label>
-          <input
-            id="room"
-            className="input code-input"
-            value={room}
-            onChange={(e) => setRoom(normalizeCode(e.target.value))}
-            placeholder="ABCD"
-            autoComplete="off"
-            autoCapitalize="characters"
-            maxLength={4}
-          />
+          {editRoom ? (
+            <>
+              <label className="label" htmlFor="room">
+                Room code
+              </label>
+              <input
+                id="room"
+                className="input code-input"
+                value={room}
+                onChange={(e) => setRoom(normalizeCode(e.target.value))}
+                placeholder="ABCD"
+                autoComplete="off"
+                autoCapitalize="characters"
+                maxLength={4}
+                autoFocus={!room}
+              />
+            </>
+          ) : (
+            <div className="room-locked">
+              <span>
+                Room <b>{room}</b>
+              </span>
+              <button type="button" className="link-btn" onClick={() => setEditRoom(true)}>
+                Not your room?
+              </button>
+            </div>
+          )}
           <label className="label" htmlFor="name">
             Your name
           </label>
@@ -115,10 +155,12 @@ export default function Play() {
             id="name"
             className="input"
             value={name}
-            onChange={(e) => setName(e.target.value.slice(0, 14))}
+            onChange={(e) => setName(e.target.value.slice(0, NAME_MAX))}
             placeholder="Your name"
             autoComplete="nickname"
-            maxLength={14}
+            enterKeyHint="go"
+            autoFocus={!editRoom || room.length === 4}
+            maxLength={NAME_MAX}
           />
           <button className="btn btn-green btn-big" disabled={normalizeCode(room).length !== 4 || !name.trim()}>
             Next: build your character
@@ -141,6 +183,12 @@ export default function Play() {
             setBio(b)
           }}
           onReady={(a, b) => {
+            // fullscreen hides the browser bar (needs this tap; failing is fine)
+            try {
+              document.documentElement.requestFullscreen?.({ navigationUI: 'hide' }).catch(() => {})
+            } catch {
+              /* not supported (iPhone) */
+            }
             setAvatar(a)
             setBio(b)
             setReady(true)
@@ -160,6 +208,7 @@ export default function Play() {
       bio={bio}
       ready={ready}
       bot={bot}
+      onRename={setName}
       onEdit={() => {
         setReady(false)
         setStep('editor')
@@ -182,6 +231,7 @@ interface RoomProps {
   bio: string
   ready: boolean
   bot: boolean
+  onRename: (name: string) => void
   onEdit: () => void
   onLeave: () => void
 }
@@ -202,7 +252,7 @@ function useCountdown(ms: number | undefined, seq: number | undefined, paused = 
   return Math.max(0, left)
 }
 
-function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }: RoomProps) {
+function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit, onLeave }: RoomProps) {
   const [status, setStatus] = useState('connecting')
   const [state, setState] = useState<GameState | null>(null)
   const [players, setPlayers] = useState<PlayerInfo[]>([])
@@ -221,6 +271,13 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
 
   const playersRef = useRef(players)
   playersRef.current = players
+
+  // no repeated names in the room: whoever joined later gets a number
+  useEffect(() => {
+    if (!players.length) return
+    const u = uniqueName(name, me, players)
+    if (u !== name) onRename(u)
+  }, [players, name, me, onRename])
 
   const nameOf = useCallback(
     (id: string) => (id === me ? 'you' : playersRef.current.find((p) => p.id === id)?.name ?? 'Someone'),
@@ -266,13 +323,13 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
         if (!m) continue
         if (m.role === 'admin') admin = true
         else if (m.role === 'player' && m.avatar)
-          list.push({ id: m.id, name: m.name, avatar: sanitizeAvatar(m.avatar), bio: sanitizeProfileLine(m.bio), ready: m.ready, online: true })
+          list.push({ id: m.id, name: m.name, avatar: sanitizeAvatar(m.avatar), bio: sanitizeProfileLine(m.bio), ready: m.ready, online: true, bot: m.bot })
       }
       setAdminOnline(admin)
       setPlayers(list)
     })
     main.subscribe(() => {
-      main.channel.track({ role: 'player', id: me, name, avatar, bio, ready }).catch(() => {})
+      main.channel.track({ role: 'player', id: me, name, avatar, bio, ready, bot }).catch(() => {})
       main.send('hello', { id: me })
     })
     mine.subscribe()
@@ -287,8 +344,8 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
   // keep presence up to date
   useEffect(() => {
     const main = mainRef.current
-    if (main?.ready) main.channel.track({ role: 'player', id: me, name, avatar, bio, ready }).catch(() => {})
-  }, [name, avatar, bio, ready, me, status])
+    if (main?.ready) main.channel.track({ role: 'player', id: me, name, avatar, bio, ready, bot }).catch(() => {})
+  }, [name, avatar, bio, ready, me, status, bot])
 
   // re-sync when the phone wakes up
   useEffect(() => {
@@ -449,6 +506,13 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
     mineRef.current?.send('vote', { id: me, vote: v, defenseKey: defense.key })
     setVotedKey(defense.key)
   }
+
+  // "Turn your phone" (CSS shows it only on landscape phones while this class is on)
+  const gameOn = Boolean(inRound && (phase === 'playing' || phase === 'defense')) || phase === 'tutorial'
+  useEffect(() => {
+    document.documentElement.classList.toggle('in-game', gameOn)
+    return () => document.documentElement.classList.remove('in-game')
+  }, [gameOn])
 
   const myTotal = state ? Math.round((state.totals[me] ?? 0) + (state.roundScores[me] ?? 0)) : 0
   const ranking = state
@@ -685,6 +749,12 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onEdit, onLeave }
           )}
         </div>
       )}
+
+      <div className="rotate-warning" role="alert">
+        <div className="rotate-phone" aria-hidden="true" />
+        <div>Turn your phone</div>
+        <div className="muted small">The game works best upright</div>
+      </div>
 
       {toast && (
         <div className="toast" key={toast.key} style={{ background: toast.color }}>

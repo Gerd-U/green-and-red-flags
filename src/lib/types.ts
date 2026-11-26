@@ -265,6 +265,8 @@ export interface PresencePlayer {
   avatar: AvatarConfig | null
   bio?: string
   ready: boolean
+  /** a bot (dev harness or the projector's demo mode) */
+  bot?: boolean
 }
 
 export interface PresenceAdmin {
@@ -280,6 +282,7 @@ export interface PlayerInfo {
   bio: string
   ready: boolean
   online: boolean
+  bot?: boolean
 }
 
 /** Data the host's script needs (names are resolved on the host phone). */

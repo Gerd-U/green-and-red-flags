@@ -3533,3 +3533,242 @@ html.host-page .screen {
 .proj .stage-verdict .ht-people {
   display: none;
 }
+
+/* =================================================================
+   v5: phone polish (responsive from 320x568 to 412x915 + landscape)
+   heights in dvh (Android's browser bar grows/shrinks), safe areas,
+   font sizes with clamp()
+   ================================================================= */
+.play-screen {
+  height: 100dvh;
+  min-height: 100svh;
+}
+.play-screen.center {
+  overflow-y: auto;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+}
+.title-sm {
+  font-size: clamp(22px, 7vw, 30px);
+}
+.input {
+  font-size: clamp(17px, 5vw, 20px);
+}
+.code-input {
+  font-size: clamp(30px, 10vw, 40px);
+}
+.join-panel {
+  gap: clamp(8px, 2dvh, 12px);
+}
+.room-locked {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #0003;
+  padding: 10px 12px;
+  font-size: clamp(18px, 5.5vw, 22px);
+  font-weight: 700;
+}
+.room-locked b {
+  color: var(--yellow);
+  letter-spacing: 0.15em;
+}
+.link-btn {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  text-decoration: underline;
+  font-size: 14px;
+  padding: 6px 0;
+}
+
+/* ---------- editor ---------- */
+.editor {
+  height: 100dvh;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(10px, env(safe-area-inset-left));
+  gap: clamp(6px, 1.2dvh, 10px);
+}
+.editor-quick {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 8px;
+}
+.editor-quick .btn {
+  font-size: clamp(16px, 4.8vw, 20px);
+  padding: clamp(10px, 1.8dvh, 16px) 8px;
+}
+.editor-preview {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+.preview-stage {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  height: clamp(110px, 22dvh, 210px);
+}
+.preview-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.editor-name {
+  font-size: clamp(18px, 5.5vw, 24px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preview-bio {
+  max-width: none;
+  border: 0;
+  font-family: inherit;
+  font-size: clamp(14px, 4.2vw, 17px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+.bio-hint {
+  font-size: 12px;
+  font-weight: 700;
+  opacity: 0.85;
+}
+.tab {
+  font-size: clamp(13px, 3.9vw, 15px);
+  padding: clamp(8px, 1.4dvh, 10px) 2px;
+}
+.editor-options {
+  overscroll-behavior: contain;
+}
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.thumb {
+  min-width: 0;
+  width: 100%;
+}
+.thumb span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.swatch-grid .swatch {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+/* landscape phones: editor in two columns */
+@media (orientation: landscape) and (max-height: 500px) {
+  .editor {
+    display: grid;
+    grid-template-columns: minmax(0, 38%) minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    max-width: none;
+  }
+  .editor-quick {
+    grid-column: 1;
+  }
+  .editor-preview {
+    grid-column: 1;
+    grid-row: 2 / 4;
+    grid-template-columns: 1fr;
+    justify-items: center;
+    align-content: start;
+  }
+  .preview-stage {
+    height: 32dvh;
+  }
+  .tabs {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .editor-options {
+    grid-column: 2;
+    grid-row: 2 / 4;
+  }
+  .thumb-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .swatch-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+  }
+}
+
+/* ---------- waiting screen ---------- */
+.wait-view {
+  height: 100dvh;
+  overflow-y: auto;
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom))
+    max(14px, env(safe-area-inset-left));
+}
+.wait-center svg {
+  height: clamp(110px, 26dvh, 220px);
+  width: auto;
+}
+.wait-title {
+  font-size: clamp(22px, 7vw, 30px);
+}
+.wait-bio {
+  font-size: clamp(14px, 4.3vw, 17px);
+}
+.big-place {
+  font-size: clamp(48px, 16vw, 72px);
+}
+
+/* ---------- "turn your phone" (only while playing, phones in landscape) ---------- */
+.rotate-warning {
+  display: none;
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  html.in-game .rotate-warning {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: #120b1ff5;
+    text-align: center;
+    font-size: clamp(20px, 6dvh, 30px);
+    font-weight: 800;
+  }
+}
+.rotate-phone {
+  width: 54px;
+  height: 92px;
+  border: 5px solid #fff;
+  border-radius: 10px;
+  position: relative;
+  animation: rotatePhone 1.8s ease-in-out infinite;
+}
+.rotate-phone::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 5px;
+  width: 12px;
+  height: 4px;
+  margin-left: -6px;
+  background: #fff;
+  border-radius: 2px;
+}
+@keyframes rotatePhone {
+  0%, 20% { transform: rotate(-90deg); }
+  60%, 100% { transform: rotate(0deg); }
+}
