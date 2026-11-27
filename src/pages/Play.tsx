@@ -467,10 +467,12 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
   const inRound = state && roundPhase && state.round > 0 && !waitingNext
   const defense = state?.defense ?? null
   const autoLeft = useCountdown(state?.auto?.remaining, state?.seq, state?.auto?.paused)
-  const stageLeft = useCountdown(defense?.remaining, state?.seq)
-  const tutorialLeft = useCountdown(state?.tutorialLeft, state?.seq)
+  // calm mode: the phase is on screen but nothing runs until the host taps Start
+  const held = Boolean(state?.held)
+  const stageLeft = useCountdown(defense?.remaining, state?.seq, held)
+  const tutorialLeft = useCountdown(state?.tutorialLeft, state?.seq, held)
   const hot = state?.hotTake ?? null
-  const htLeft = useCountdown(hot?.remaining, state?.seq)
+  const htLeft = useCountdown(hot?.remaining, state?.seq, held)
 
   // auto-pick a random target if the player does not choose in time
   useEffect(() => {
@@ -510,7 +512,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
 
   // bots vote the Hot Take randomly too
   useEffect(() => {
-    if (!bot || !hot || hot.stage !== 'vote' || htVote?.key === hot.key) return
+    if (!bot || !hot || hot.stage !== 'vote' || held || htVote?.key === hot.key) return
     const key = hot.key
     const t = setTimeout(() => {
       const v = Math.random() < 0.5 ? 'red' : 'green'
@@ -520,7 +522,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
     return () => clearTimeout(t)
     // only restart the timer when a new Hot Take vote starts
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bot, hot?.key, hot?.stage, htVote?.key, me])
+  }, [bot, hot?.key, hot?.stage, held, htVote?.key, me])
 
   const vote = (v: 'convinced' | 'not') => {
     if (!defense) return
@@ -546,6 +548,16 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
 
   return (
     <div className="screen play-screen">
+      {held && phase === 'playing' && inRound && state && (
+        <div className="overlay calm-title">
+          <div className="chip">
+            Round {state.round} of {TOTAL_ROUNDS}
+          </div>
+          <h1 className="wait-title">{roundConfig(state.round).name}</h1>
+          <p className="calm-line">{roundConfig(state.round).tagline}</p>
+          <p className="calm-line muted">Get ready! The host starts the round.</p>
+        </div>
+      )}
       <PolyBackground variant="dark" />
 
       {inRound && state ? (
@@ -564,6 +576,11 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
           onPower={gotPower}
           onFeedback={onFeedback}
         />
+      ) : phase === 'tutorial' && held ? (
+        <div className="wait-view calm-wait">
+          <h1 className="wait-title">How to play</h1>
+          <p className="calm-line">Look at the big screen and listen. The practice starts soon.</p>
+        </div>
       ) : phase === 'tutorial' ? (
         <PhoneTutorial avatar={avatar} msLeft={tutorialLeft} />
       ) : (
@@ -682,10 +699,10 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
                 ) : (
                   <div className="vote-buttons">
                     <div className="vote-timer">{stageLeft > 0 ? `${Math.ceil(stageLeft / 1000)}s to vote` : 'Vote now!'}</div>
-                    <button className="btn btn-green btn-huge" onClick={() => vote('convinced')}>
+                    <button className="btn btn-green btn-huge vote-btn" onClick={() => vote('convinced')}>
                       👍 Convinced
                     </button>
-                    <button className="btn btn-red btn-huge" onClick={() => vote('not')}>
+                    <button className="btn btn-red btn-huge vote-btn" onClick={() => vote('not')}>
                       👎 Not convinced
                     </button>
                   </div>
@@ -707,19 +724,21 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
         <div className="overlay hottake-phone">
           <div className="chip">🔥 Hot Take</div>
           <p className="quote ht-phone-text">“{hot.text}”</p>
+          {hot.stage === 'vote' && held && <h2 className="shout">Read it and think. The vote starts soon.</h2>}
           {hot.stage === 'vote' &&
+            !held &&
             (htVote?.key === hot.key ? (
               <h2 className="shout">
-                You voted {htVote.vote === 'red' ? '🟥 RED' : '🟩 GREEN'}. Secret until the reveal!
+                You voted {htVote.vote === 'red' ? '🚩 RED' : '💚 GREEN'}. It is a secret for now!
               </h2>
             ) : (
               <div className="vote-buttons">
                 <div className="vote-timer">Red or green?{htLeft > 0 ? ` ${Math.ceil(htLeft / 1000)}s` : ''}</div>
-                <button className="btn btn-red btn-huge" onClick={() => voteHotTake('red')}>
-                  🟥 RED FLAG
+                <button className="btn btn-red btn-huge vote-btn" onClick={() => voteHotTake('red')}>
+                  🚩 RED
                 </button>
-                <button className="btn btn-green btn-huge" onClick={() => voteHotTake('green')}>
-                  🟩 GREEN FLAG
+                <button className="btn btn-green btn-huge vote-btn" onClick={() => voteHotTake('green')}>
+                  💚 GREEN
                 </button>
               </div>
             ))}

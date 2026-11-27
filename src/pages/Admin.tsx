@@ -4,7 +4,7 @@ import PolyBackground from '../components/PolyBackground'
 import QRCode from '../components/QRCode'
 import RoundBackdrop from '../components/RoundBackdrop'
 import Tutorial from '../components/Tutorial'
-import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, roundConfig, START_HEARTS, TOTAL_ROUNDS } from '../lib/game'
+import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, HOTTAKE_VOTE_MS, TUTORIAL_MS, roundConfig, START_HEARTS, TOTAL_ROUNDS } from '../lib/game'
 import { makeRoomCode } from '../lib/room'
 import { DEMO_NAMES } from './Play'
 import { duckMusic, setMusicBoost, setMusicStyle, startMusic, stopMusic, type MusicStyle } from '../lib/music'
@@ -86,7 +86,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
   const cfg = roundConfig(game.round)
   const t = elapsed()
   const timeLeft = Math.max(0, Math.ceil((cfg.durationMs - Math.max(0, t)) / 1000))
-  const countdown = game.phase === 'playing' && t < 0 ? Math.ceil(-t / 1000) : 0
+  const countdown = game.phase === 'playing' && t < 0 && !game.held ? Math.ceil(-t / 1000) : 0
   const readyCount = lobbyPlayers.filter((p) => p.ready).length
   const auto = game.auto
   const autoLeft = auto ? (auto.paused ? auto.pausedLeft : Math.max(0, auto.endsAt - now)) : 0
@@ -189,9 +189,11 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
 
   // ---- overlays: only one at a time, never over a results screen ----
   const paused = game.phase === 'playing' && !game.running && t >= 0 && t < cfg.durationMs && t > -COUNTDOWN_MS
-  const overlay: 'countdown' | 'paused' | 'sabotage' | 'announce' | null =
+  const overlay: 'title' | 'countdown' | 'paused' | 'sabotage' | 'announce' | null =
     game.phase !== 'playing'
       ? null
+      : game.held
+        ? 'title'
       : countdown > 0
         ? 'countdown'
         : paused
@@ -258,7 +260,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
             countdown={game.lobbyEndsAt ? Math.max(0, game.lobbyEndsAt - now) : null}
           />
         )}
-        {game.phase === 'tutorial' && <Tutorial secondsLeft={Math.ceil(Math.max(0, game.tutorialEndsAt - now) / 1000)} />}
+        {game.phase === 'tutorial' && <Tutorial secondsLeft={game.held ? TUTORIAL_MS / 1000 : Math.ceil(Math.max(0, game.tutorialEndsAt - now) / 1000)} />}
         {inRound && (
           <div className="proj-live">
             <LiveGrid
@@ -280,7 +282,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
         )}
         {game.phase === 'roundEnd' && <RoundResults game={game} rows={rows} autoLeft={autoLeft} paused={Boolean(auto?.paused)} />}
         {game.phase === 'hotTake' && game.hotTake && (
-          <HotTakeView h={game.hotTake} players={game.players} left={Math.max(0, game.hotTake.stageEndsAt - now)} />
+          <HotTakeView h={game.hotTake} players={game.players} held={game.held} left={game.held ? HOTTAKE_VOTE_MS : Math.max(0, game.hotTake.stageEndsAt - now)} />
         )}
         {game.phase === 'awards' && (
           <AwardsShow
@@ -304,6 +306,17 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       )}
 
       {/* ---------- overlays ---------- */}
+      {/* calm mode: the round's title card, nothing moves until the host taps Start */}
+      {overlay === 'title' && (
+        <div className="overlay countdown-big round-title">
+          <small>
+            Round {game.round} of {TOTAL_ROUNDS}
+          </small>
+          <span className="round-title-name">{cfg.name}</span>
+          <em>{cfg.tagline}</em>
+          <div className="waiting-host">Get ready!</div>
+        </div>
+      )}
       {overlay === 'countdown' && (
         <div className="overlay countdown-big" key={countdown}>
           <span>{countdown}</span>
@@ -326,11 +339,12 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       <div className={`proj-controls ${controlsVisible ? 'show' : ''}`} aria-hidden={!controlsVisible}>
         {hostOnline && <div className="proj-controls-note">Host connected · press H to show</div>}
         <div className="proj-controls-row">
+          {game.held && b(game.phase === 'hotTake' ? 'Start vote ▶' : 'Start ▶', actions.go, 'green')}
           {game.phase === 'intro' && b('Open lobby ▶', actions.openLobby, 'green')}
           {(game.phase === 'intro' || game.phase === 'lobby') && b(game.lobbyEndsAt ? '⏱ Stop countdown' : '⏱ Starting soon', actions.lobbyTimer)}
           {game.phase === 'lobby' && b('Start game ▶', actions.startGame, 'green', readyCount === 0)}
-          {game.phase === 'tutorial' && b('Skip tutorial ⏭', actions.skip, 'green')}
-          {game.phase === 'playing' && (
+          {game.phase === 'tutorial' && !game.held && b('Round 1 ▶', actions.startRound, 'green')}
+          {game.phase === 'playing' && !game.held && (
             <>
               {b(game.running ? '⏸ Pause' : '▶ Resume', actions.togglePause)}
               {b('End round', actions.endRound)}
@@ -338,20 +352,15 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
           )}
           {game.phase === 'defense' && (
             <>
-              {auto && b(auto.paused ? '▶ Resume' : '⏸ Hold', actions.togglePause)}
-              {game.defense?.stage === 'talk' && b('Objection!', actions.objection, 'gold')}
-              {b(game.defense?.stage === 'talk' ? 'Start vote ⏭' : game.defense?.stage === 'vote' ? 'Close vote ⏭' : 'Continue ▶', actions.skip, 'green')}
+              {game.defense?.stage === 'talk' && !game.held && b('Objection!', actions.objection, 'gold')}
+              {!game.held && b(game.defense?.stage === 'talk' ? 'Start vote ▶' : game.defense?.stage === 'vote' ? 'Show results ▶' : 'Back to the game ▶', actions.skip, 'green')}
             </>
           )}
-          {(game.phase === 'roundEnd' || game.phase === 'awards') && auto && (
-            <>
-              {b(auto.paused ? '▶ Resume timer' : '⏸ Hold timer', actions.togglePause)}
-              {b(`${auto.label} now ▶`, actions.skip, 'green')}
-            </>
-          )}
+          {game.phase === 'roundEnd' && auto && b(`${auto.label} ▶`, actions.skip, 'green')}
+          {game.phase === 'awards' && !game.held && b('Podium ▶', actions.showPodium, 'green')}
           {game.phase === 'hotTake' && game.hotTake && (
             <>
-              {game.hotTake.stage === 'vote' ? b('Reveal ▶', actions.htReveal, 'green') : b("Host's verdict", actions.htVerdict, 'gold')}
+              {game.hotTake.stage === 'vote' ? !game.held && b('Show results ▶', actions.htReveal, 'green') : b('Your opinion', actions.htVerdict, 'gold')}
               {b('Next round ▶', actions.htNext, 'green')}
             </>
           )}

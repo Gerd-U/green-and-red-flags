@@ -4668,3 +4668,211 @@ h2,
 .hs-nextline:disabled {
   opacity: 0.45;
 }
+
+/* =================================================================
+   v7: host calm mode (status line, big script, Next line, main button)
+   ================================================================= */
+.host-app {
+  gap: 8px;
+}
+.host-app .host-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.host-app .host-top > * {
+  flex: none;
+}
+.host-app .host-top > .host-phase {
+  flex: 1;
+  min-width: 0;
+}
+.host-app .host-phase {
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.host-stat {
+  color: #e4dcf5;
+  white-space: nowrap;
+}
+.host-app .host-clock {
+  font-size: 14px;
+  font-weight: 700;
+  color: #e4dcf5;
+  font-family: var(--font);
+}
+.host-app .host-gear {
+  width: 40px;
+  height: 40px;
+  font-size: 20px;
+  background: #2f2448;
+  box-shadow: inset 0 0 0 2px #ffffff40;
+}
+.host-offline {
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  background: #b4162f;
+}
+/* the script fills the middle; nothing is drawn over it */
+.host-app .host-script-area {
+  flex: 1;
+  min-height: 0;
+}
+.host-app .host-script-area .host-script {
+  overflow: hidden;
+  background: #120a1f;
+  box-shadow: inset 0 0 0 2px #ffffff22;
+  padding: 10px;
+}
+.host-app .hs-step {
+  background: #1d1430;
+}
+.host-app .hs-title {
+  color: #e4dcf5;
+}
+/* "Next line": neutral, clearly not the game button */
+.host-app .hs-nextline {
+  background: #2f2448;
+  color: #fff;
+  border: 0;
+  box-shadow: inset 0 0 0 2px #b9acd6;
+  clip-path: none;
+  border-radius: 10px;
+}
+.host-app .hs-nextline:disabled {
+  opacity: 1;
+  background: #241c35;
+  color: #b9acd6;
+  box-shadow: inset 0 0 0 2px #4a3d66;
+}
+/* the main game button: green = Start, blue = Next, amber = needs you */
+.host-main {
+  border: 0;
+  min-height: clamp(64px, 11dvh, 96px);
+  padding: 10px 14px;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 6.8vw, 30px);
+  font-weight: 800;
+  border-radius: 14px;
+  box-shadow: 0 4px 0 #0009, inset 0 0 0 3px #ffffff55;
+  touch-action: manipulation;
+}
+.host-main.start {
+  background: #22c55e;
+  color: #052e12;
+}
+.host-main.next {
+  background: #2563eb;
+  color: #fff;
+}
+.host-main.attn {
+  background: #fbbf24;
+  color: #1b1030;
+}
+.host-main:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #0009, inset 0 0 0 3px #ffffff55;
+}
+.host-main:disabled {
+  background: #3b3350;
+  color: #d6cfe6;
+  box-shadow: inset 0 0 0 2px #6b5f86;
+}
+.host-attn {
+  min-height: 18px;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  color: #fde68a;
+}
+.host-menu-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.host-menu-row:empty {
+  display: none;
+}
+
+/* =================================================================
+   v7: contrast (WCAG AA) for host and player screens
+   ================================================================= */
+/* buttons: solid, with an inner border that separates them from the triangles */
+.btn {
+  box-shadow: inset 0 0 0 2px #ffffff40;
+}
+.btn-ghost {
+  --c: #33274d;
+  color: #fff;
+}
+.btn-red {
+  --c: linear-gradient(135deg, #e11d48 0%, #c8102e 60%, #a50d26 100%);
+  color: #fff;
+}
+.btn-green {
+  --c: linear-gradient(135deg, #34d36f 0%, #22c55e 60%, #1fb455 100%);
+  color: #052e12;
+}
+.btn-gold {
+  color: #1b1030;
+}
+/* disabled: clearly off, still readable */
+.btn:disabled {
+  opacity: 1;
+  --c: #3b3350;
+  background: #3b3350;
+  color: #d6cfe6;
+  box-shadow: inset 0 0 0 2px #6b5f86;
+  filter: saturate(0.4);
+}
+/* softer triangle background behind text on the phones and the host */
+.play-screen .poly-bg,
+.host-app .poly-bg,
+.host-screen .poly-bg,
+.editor .poly-bg,
+.screen.center .poly-bg {
+  opacity: 0.35;
+  filter: blur(2px);
+}
+/* secondary text a bit lighter */
+.play-screen .muted,
+.host-app .muted,
+.host-screen .muted {
+  color: #cfc4e8;
+}
+/* votes: never only by color (icon + big text) */
+.vote-btn {
+  font-size: clamp(24px, 7.5vw, 32px);
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 0 0 3px #ffffff80;
+}
+/* calm mode on the phones */
+.calm-title {
+  gap: 12px;
+}
+.calm-line {
+  font-size: clamp(17px, 5vw, 20px);
+  font-weight: 700;
+  max-width: 30ch;
+  margin: 0 auto;
+  text-align: center;
+}
+.calm-wait {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+}
+/* calm mode on the projector: the round's title card */
+.round-title .round-title-name {
+  font-size: var(--fs-xxl, 96px);
+  line-height: 1;
+}

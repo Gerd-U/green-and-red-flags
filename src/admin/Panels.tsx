@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, roundConfig, TOTAL_ROUNDS, WAITING_HOST } from '../lib/game'
+import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, roundConfig, WAITING_HOST } from '../lib/game'
 import type { Award, PlayerInfo, PodiumStats, RoundSummary, SabotageEvent } from '../lib/types'
 import type { AdminGame, Announcement } from './useAdminGame'
 
@@ -78,7 +78,8 @@ export function Lobby({ players, code, joinUrl, qr, countdown }: { players: Play
 export function DefenseView({ game, player, autoLeft }: { game: AdminGame; player: PlayerInfo | undefined; autoLeft: number }) {
   const d = game.defense
   if (!d) return null
-  const left = Math.max(0, d.stageEndsAt - performance.now())
+  // calm mode: the talking time waits for the host's Start
+  const left = game.held ? DEFENSE_TALK_MS : Math.max(0, d.stageEndsAt - performance.now())
   const total = d.stage === 'talk' ? DEFENSE_TALK_MS : DEFENSE_VOTE_MS
   const ok = d.result === 'convinced'
   return (
@@ -115,7 +116,7 @@ export function DefenseView({ game, player, autoLeft }: { game: AdminGame; playe
               <div className="timer-bar">
                 <div style={{ width: `${(left / total) * 100}%` }} />
               </div>
-              {left <= 0 && <div className="waiting-host">{WAITING_HOST}</div>}
+              {(left <= 0 || game.held) && <div className="waiting-host">{game.held ? 'Get ready…' : WAITING_HOST}</div>}
             </div>
           )}
           {d.stage === 'result' && (
@@ -125,7 +126,7 @@ export function DefenseView({ game, player, autoLeft }: { game: AdminGame; playe
                 👍 {d.convinced} · 👎 {d.notConvinced} —{' '}
                 {ok ? `${d.name} gets the heart and points back` : `${d.name} loses 100 extra points`}
               </p>
-              <p className="auto-big">{autoLeft > 0 ? `Back to the game in ${Math.ceil(autoLeft / 1000)}…` : WAITING_HOST}</p>
+              <p className="auto-big">{WAITING_HOST}</p>
             </>
           )}
         </div>
@@ -170,7 +171,6 @@ export function Announcer({ items }: { items: Announcement[] }) {
 export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame; rows: RankRow[]; autoLeft: number; paused: boolean }) {
   const sum: RoundSummary | undefined = game.summary
   const cfg = roundConfig(game.round)
-  const last = game.round >= TOTAL_ROUNDS
   return (
     <div className="round-end">
       <div className="re-left">
@@ -188,8 +188,7 @@ export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame
           </div>
         )}
         <div className="re-timer next">
-          {paused ? '⏸ ' : ''}
-          {autoLeft > 0 ? `${last ? 'Awards' : 'Next'} in ${Math.ceil(autoLeft / 1000)}` : WAITING_HOST}
+          {WAITING_HOST}
         </div>
       </div>
     </div>

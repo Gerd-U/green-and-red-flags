@@ -43,7 +43,7 @@ export function IntroScreen({ code, joinUrl, players, qr }: { code: string; join
   )
 }
 
-export function HotTakeView({ h, players, left }: { h: HotTake; players: Record<string, PlayerInfo>; left: number }) {
+export function HotTakeView({ h, players, left, held = false }: { h: HotTake; players: Record<string, PlayerInfo>; left: number; held?: boolean }) {
   const speaker = h.speaker ? players[h.speaker] : undefined
   const red = (h.red ?? []).map((id) => players[id]).filter(Boolean)
   const green = (h.green ?? []).map((id) => players[id]).filter(Boolean)
@@ -54,7 +54,7 @@ export function HotTakeView({ h, players, left }: { h: HotTake; players: Record<
 
       {h.stage === 'vote' && (
         <div className="ht-vote">
-          <div className="ht-q">Red flag or green flag? Vote in secret on your phone!</div>
+          <div className="ht-q">{held ? 'Read it and think: red flag or green flag?' : 'Red flag or green flag? Vote in secret on your phone!'}</div>
           <div className="timer">
             <div className="timer-num">{left > 0 ? Math.ceil(left / 1000) : '⏳'}</div>
             <div className="timer-bar">

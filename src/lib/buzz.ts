@@ -23,6 +23,11 @@ function record(result: BuzzResult) {
   listeners.forEach((cb) => cb())
 }
 
+/** for a direct navigator.vibrate() call made inside a tap: remember its result */
+export function noteBuzz(ok: boolean) {
+  record(ok ? 'ok' : 'refused')
+}
+
 export function buzz(pattern: number | number[]): boolean {
   try {
     if (!hasVibrationApi()) {

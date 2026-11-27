@@ -175,6 +175,8 @@ export interface GameState {
   defense: Defense | null
   hotTake: HotTake | null
   auto: AutoAdvance | null
+  /** calm mode: the phase is shown but waits for the host's Start */
+  held?: boolean
   /** ms left in the tutorial */
   tutorialLeft?: number
   /** "Starting soon" countdown in the lobby (ms left), null when off */
