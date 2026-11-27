@@ -456,7 +456,10 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
     }
   }
 
-  const others = players.filter((p) => p.id !== me)
+  // sabotage targets: only people playing this round (not someone waiting for the next one)
+  const others = players.filter((p) => p.id !== me && (!state?.roundIds?.length || state.roundIds.includes(p.id)))
+  const othersRef = useRef(others)
+  othersRef.current = others
   const phase = state?.phase
   const roundPhase = phase === 'playing' || phase === 'defense' || phase === 'roundEnd'
   // joined after the round started: wait for the next one
@@ -473,7 +476,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
   useEffect(() => {
     if (!pendingPowers.length) return
     const t = setTimeout(() => {
-      const list = playersRef.current.filter((p) => p.id !== me)
+      const list = othersRef.current
       if (list.length) sendPower(list[Math.floor(Math.random() * list.length)].id)
       else setPendingPowers((l) => l.slice(1))
     }, bot ? 600 + Math.random() * 1500 : 7000)
