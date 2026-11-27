@@ -87,6 +87,18 @@ export interface CatchFx {
   text?: string
 }
 
+/** one line of the projector's "Live feed" */
+export interface FeedItem {
+  key: number
+  at: number
+  kind: 'green' | 'red' | 'soulmate' | 'ick' | 'sabotage' | 'blocked'
+  pid: string
+  to?: string
+  power?: SabotageEvent['power']
+  cardId?: number
+  round: number
+}
+
 export interface Announcement {
   key: number
   text: string
@@ -199,7 +211,8 @@ function freshGame(keep?: Pick<AdminGame, 'createdAt' | 'players' | 'hostTokens'
     roundIds: [],
     createdAt: keep?.createdAt ?? Date.now(),
     hostTokens: keep?.hostTokens ?? [],
-    seq: 0,
+    // starts from the clock, so after a projector reload the phones still see newer states
+    seq: Date.now(),
   }
 }
 
@@ -258,6 +271,12 @@ export function useAdminGame(code: string) {
   const g = useRef<AdminGame>(initial)
   const ticks = useRef<Record<string, TickBuffer>>({})
   const catchFx = useRef<CatchFx[]>([])
+  const feed = useRef<FeedItem[]>([])
+  const feedKey = useRef(0)
+  const pushFeed = (item: Omit<FeedItem, 'key' | 'at'>) => {
+    feed.current.push({ ...item, key: ++feedKey.current, at: performance.now() })
+    if (feed.current.length > 30) feed.current.splice(0, 15)
+  }
   const main = useRef<Room | null>(null)
   const playerRooms = useRef<Record<string, Room>>({})
   const hostRooms = useRef<Record<string, Room>>({})
@@ -424,6 +443,14 @@ export function useAdminGame(code: string) {
     g.current.auto = { label, endsAt: performance.now() + ms, paused: false, pausedLeft: ms, action }
   }
 
+  /** what comes after the round results: next round, a Hot Take or the awards */
+  const scheduleAfterRound = () => {
+    const s = g.current
+    if (s.round >= TOTAL_ROUNDS) setAuto('Awards', ROUND_RESULTS_MS, 'awards')
+    else if (HOTTAKE_AFTER_ROUNDS.includes(s.round)) setAuto('Hot Take', ROUND_RESULTS_MS, 'hotTake')
+    else setAuto(`Round ${s.round + 1}`, ROUND_RESULTS_MS, 'nextRound')
+  }
+
   const onlinePlayers = () => Object.values(g.current.players).filter((p) => p.online)
 
   const commitRoundScores = () => {
@@ -494,10 +521,7 @@ export function useAdminGame(code: string) {
     s.defense = null
     s.phase = 'roundEnd'
     s.summary = { round: s.round, topRed: topOf(s.roundRed), question: pick(DISCUSSION_QUESTIONS) }
-    const last = s.round >= TOTAL_ROUNDS
-    if (last) setAuto('Awards', ROUND_RESULTS_MS, 'awards')
-    else if (HOTTAKE_AFTER_ROUNDS.includes(s.round)) setAuto('Hot Take', ROUND_RESULTS_MS, 'hotTake')
-    else setAuto(`Round ${s.round + 1}`, ROUND_RESULTS_MS, 'nextRound')
+    scheduleAfterRound()
     commit()
     persist(true)
   }
@@ -773,6 +797,7 @@ export function useAdminGame(code: string) {
     if (m.round !== s.round) return
     catchFx.current.push({ pid: m.id, kind: m.kind, at: performance.now(), cardId: m.cardId, text: m.text })
     if (catchFx.current.length > 60) catchFx.current.splice(0, 30)
+    if (m.kind !== 'power') pushFeed({ kind: m.kind, pid: m.id, cardId: m.cardId, round: m.round })
     const name = s.players[m.id]?.name ?? 'Someone'
     const t = elapsed()
     if (m.kind === 'red' && m.text) {
@@ -817,6 +842,7 @@ export function useAdminGame(code: string) {
     main.current?.send('sabotage', ev)
     inc(s.counters.sent, m.from)
     const shielded = Boolean(ticks.current[m.to]?.cur?.shield)
+    pushFeed({ kind: shielded ? 'blocked' : 'sabotage', pid: m.from, to: m.to, power: m.power, round: s.round })
     if (shielded) {
       announce('BLOCKED BY THERAPY!', '#22d3ee', `${s.players[m.to].name} was protected`, 'shield')
     } else {
@@ -928,6 +954,21 @@ export function useAdminGame(code: string) {
   )
 
   // --- connect ---
+  // after a reload during the results or the awards, the timer comes back held,
+  // so the host (or the panel) has a button to go on instead of getting stuck
+  useEffect(() => {
+    const s = g.current
+    if (s.auto || (s.phase !== 'roundEnd' && s.phase !== 'awards')) return
+    if (s.phase === 'roundEnd') scheduleAfterRound()
+    else setAuto('Final podium', Math.max(1, s.awards?.length ?? 0) * AWARD_SHOW_MS + 1500, 'podium')
+    const held = g.current.auto as AdminGame['auto']
+    if (held) {
+      held.paused = true
+      held.pausedLeft = 5000
+    }
+    commit()
+  }, [])
+
   useEffect(() => {
     const room = openChannel(mainTopic(code), { presenceKey: 'admin', onStatus: setStatus })
     main.current = room
@@ -1062,6 +1103,7 @@ export function useAdminGame(code: string) {
     g,
     ticks,
     catchFx,
+    feed,
     version,
     status,
     sabotages,

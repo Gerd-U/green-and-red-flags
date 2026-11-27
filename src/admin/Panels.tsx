@@ -12,11 +12,11 @@ export interface RankRow {
   streak: number
 }
 
-export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: boolean }) {
-  // row height follows the screen height (same look at 720p and 1080p)
-  const ROW_H = Math.round(Math.max(compact ? 52 : 64, window.innerHeight * (compact ? 0.072 : 0.09)))
+export function Ranking({ rows, compact = false, dense = false }: { rows: RankRow[]; compact?: boolean; dense?: boolean }) {
+  // row height follows the screen height (same look at 720p and 1080p); dense = during the round, next to the live feed
+  const ROW_H = Math.round(dense ? Math.max(32, window.innerHeight * 0.042) : Math.max(compact ? 52 : 64, window.innerHeight * (compact ? 0.072 : 0.09)))
   return (
-    <div className={`ranking ${compact ? 'compact' : ''}`} style={{ height: rows.length * ROW_H }}>
+    <div className={`ranking ${compact ? 'compact' : ''} ${dense ? 'dense' : ''}`} style={{ height: rows.length * ROW_H }}>
       {rows.map((r, i) => (
         <div
           key={r.player.id}
@@ -24,11 +24,11 @@ export function Ranking({ rows, compact = false }: { rows: RankRow[]; compact?: 
           style={{ transform: `translateY(${i * ROW_H}px)`, height: ROW_H - 8, ['--pc' as string]: r.player.avatar.topColor }}
         >
           <span className="rank-pos">{i + 1}</span>
-          <Avatar config={r.player.avatar} size={compact ? 34 : 44} crop="head" animate={false} />
+          <Avatar config={r.player.avatar} size={dense ? 26 : compact ? 34 : 44} crop="head" animate={false} />
           <span className="rank-name">
             {r.player.name}
             {r.player.bot && <span className="bot-tag">BOT</span>}
-            <span className="rank-hearts">{'♥'.repeat(Math.max(0, r.hearts))}</span>
+            {!dense && <span className="rank-hearts">{'♥'.repeat(Math.max(0, r.hearts))}</span>}
           </span>
           {r.streak >= 2 && <span className="rank-combo">🔥{r.streak}</span>}
           <span className="rank-score">{Math.round(r.score)}</span>

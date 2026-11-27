@@ -8,6 +8,7 @@ import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, roundConfig, START_HEARTS, TO
 import { makeRoomCode } from '../lib/room'
 import { DEMO_NAMES } from './Play'
 import { duckMusic, isMusicOn, isSfxOn, playSfx, setMusicOn, setMusicTempo, setSfxOn, startMusic, stopMusic, unlockAudio } from '../lib/sfx'
+import LiveFeed from '../admin/LiveFeed'
 import LiveGrid from '../admin/LiveGrid'
 import { Announcer, AwardsShow, DefenseView, Lobby, Podium, Ranking, RoundResults, SabotageAnim, type RankRow } from '../admin/Panels'
 import { clearAdminSnapshot, loadAdminSnapshot, useAdminGame } from '../admin/useAdminGame'
@@ -27,8 +28,8 @@ export default function Admin() {
   )
 }
 
-/** Controls are hidden while the host phone is connected; mouse move or "H" shows them for 4 s. */
-function useControlsVisible(hostOnline: boolean) {
+/** Controls stay hidden so they never cover the game; mouse move or "H" shows them for 4 s. */
+function useControlsVisible() {
   const [until, setUntil] = useState(0)
   const [, force] = useState(0)
   useEffect(() => {
@@ -45,13 +46,13 @@ function useControlsVisible(hostOnline: boolean) {
       clearInterval(id)
     }
   }, [])
-  return !hostOnline || performance.now() < until
+  return performance.now() < until
 }
 
 function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void }) {
-  const { g, ticks, catchFx, status, sabotages, announcements, objectionKey, hostOnline, elapsed, actions } = useAdminGame(code)
+  const { g, ticks, catchFx, feed, status, sabotages, announcements, objectionKey, hostOnline, elapsed, actions } = useAdminGame(code)
   const [, setTick] = useState(0)
-  const controlsVisible = useControlsVisible(hostOnline)
+  const controlsVisible = useControlsVisible()
 
   // light re-render for timers / ranking
   useEffect(() => {
@@ -261,7 +262,8 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
             />
             <aside className="proj-rank">
               <div className="proj-label">Ranking</div>
-              <Ranking rows={rows} compact />
+              <Ranking rows={rows} compact dense />
+              <LiveFeed feed={feed} players={gamePlayers} seed={game.seed} round={game.round} gameSeed={game.gameSeed} />
             </aside>
           </div>
         )}
@@ -309,6 +311,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       {game.phase === 'defense' && <ObjectionOverlay k={objectionKey} />}
 
       {/* ---------- controls (hidden while the host phone is connected) ---------- */}
+      {!controlsVisible && <div className="proj-controls-pill">{hostOnline ? '🎤 Host connected' : '🎛 Move the mouse or press H for controls'}</div>}
       <div className={`proj-controls ${controlsVisible ? 'show' : ''}`} aria-hidden={!controlsVisible}>
         {hostOnline && <div className="proj-controls-note">Host connected · press H to show</div>}
         <div className="proj-controls-row">
