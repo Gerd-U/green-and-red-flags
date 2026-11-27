@@ -4581,3 +4581,18 @@ h2,
   color: var(--yellow);
   animation: pulse 0.8s ease-in-out infinite alternate;
 }
+
+/* host ⚙️ menu: vibration diagnosis */
+.vib-diag {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  font-size: 14px;
+  background: #ffffff0f;
+}
+.vib-warn {
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--yellow);
+}

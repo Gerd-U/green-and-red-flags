@@ -50,12 +50,16 @@ export function useCues(info: HostInfo | null, receivedAt: number, connected: bo
 
   /** Vibrate + flash + sound for one cue (several cues are spaced out). */
   const signal = useCallback((kind: CueKind, delay = 0) => {
-    window.setTimeout(() => {
+    const run = () => {
       const pf = prefsRef.current
       if (pf.vibration) buzz(CUE_STYLE[kind].vibrate)
+      // the flash always works, even when the phone refuses to vibrate
       if (pf.flash) setFlash({ kind, n: Date.now() })
       if (pf.sound) cueDing(kind)
-    }, delay)
+    }
+    // no delay: run now, still inside the tap that caused it (Test cue)
+    if (delay <= 0) run()
+    else window.setTimeout(run, delay)
   }, [])
 
   const fire = useCallback(
@@ -108,12 +112,15 @@ export function useCues(info: HostInfo | null, receivedAt: number, connected: bo
   const testCues = () => {
     unlockAudio()
     const kinds: CueKind[] = ['speak', 'act', 'warn']
-    kinds.forEach((kind, i) =>
-      window.setTimeout(() => {
+    kinds.forEach((kind, i) => {
+      const go = () => {
         const c: FiredCue = { key: `test-${kind}-${Date.now()}`, id: 'test', kind, text: `Test: ${CUE_STYLE[kind].label.toLowerCase()}`, at: Date.now(), phase: info?.state.phase ?? '' }
         fire([c])
-      }, i * 1800)
-    )
+      }
+      // the first one runs right inside the tap (some phones only vibrate then)
+      if (i === 0) go()
+      else window.setTimeout(go, i * 1800)
+    })
   }
 
   return { prefs, updatePrefs, banner, dismiss: () => setBanner(null), flash, history, testCues }

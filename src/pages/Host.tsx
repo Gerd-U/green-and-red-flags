@@ -23,6 +23,7 @@ import HostScript from '../host/HostScript'
 import { CUE_STYLE } from '../host/cues'
 import { useCues } from '../host/useCues'
 import { unlockAudio } from '../lib/sfx'
+import { buzz, hasVibrationApi, lastBuzz, onBuzz } from '../lib/buzz'
 
 // /host — the moderator's phone. It never plays: it is a remote control for
 // the projector (which stays the game authority) plus a teleprompter.
@@ -225,6 +226,9 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
   const [received, setReceived] = useState(0)
   const [showScript, setShowScript] = useState(true)
   const [menu, setMenu] = useState(false)
+  // refresh the vibration diagnosis in the ⚙️ menu after every call
+  const [, setBuzzN] = useState(0)
+  useEffect(() => onBuzz(() => setBuzzN((n) => n + 1)), [])
   const [, force] = useState(0)
   const roomRef = useRef<Room | null>(null)
   // a tap on "Start hosting" is needed: Chrome on Android only lets a page
@@ -299,11 +303,7 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
   const send = useCallback(
     (cmd: HostCmdName, arg?: string) => {
       roomRef.current?.send('cmd', { token: session.token, cmd, arg })
-      try {
-        navigator.vibrate?.(30)
-      } catch {
-        /* ignore */
-      }
+      buzz(30)
     },
     [session]
   )
@@ -327,11 +327,7 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
             className="btn btn-green btn-big"
             onClick={() => {
               unlockAudio()
-              try {
-                navigator.vibrate?.(60)
-              } catch {
-                /* ignore */
-              }
+              buzz(60) // inside the tap: from now on the phone may vibrate
               setStarted(true)
             }}
           >
@@ -563,6 +559,28 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
             <button className="btn btn-ghost" onClick={cues.testCues}>
               Test cue (SPEAK, ACT, WARN)
             </button>
+            {(() => {
+              const lb = lastBuzz()
+              const res = !lb ? 'not tried yet' : lb.result === 'ok' ? 'true' : lb.result === 'refused' ? 'false' : lb.result === 'no-tap' ? 'false (tap the screen first)' : lb.result === 'no-api' ? 'false (no Vibration API)' : 'false (error)'
+              return (
+                <div className="vib-diag">
+                  <div>
+                    Vibration API: <b>{hasVibrationApi() ? 'yes' : 'no'}</b>
+                  </div>
+                  <div>
+                    Vibration switch: <b>{cues.prefs.vibration ? 'on' : 'off'}</b>
+                  </div>
+                  <div>
+                    Last call: <b>{res}</b>
+                    {lb && <span className="muted"> · {new Date(lb.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>}
+                  </div>
+                  {lb && lb.result !== 'ok' && (
+                    <div className="vib-warn">Your phone blocked vibration. Check silent mode, Do Not Disturb or battery saver.</div>
+                  )}
+                  {!hasVibrationApi() && <div className="vib-warn">This browser can&apos;t vibrate (for example, iPhone). The screen flash still works.</div>}
+                </div>
+              )
+            })()}
             {!wakeOk && <div className="cue-wake">💡 Keep your screen on during the activity (this browser can't do it automatically).</div>}
             {cues.history.length > 0 && (
               <div className="cue-history">
