@@ -4572,3 +4572,12 @@ h2,
 .fcard .fcard-text {
   -webkit-line-clamp: 3;
 }
+
+/* a timer reached 0: the game waits for the host's Next */
+.waiting-host {
+  margin-top: 1vh;
+  font-size: var(--fs-m, 22px);
+  font-weight: 800;
+  color: var(--yellow);
+  animation: pulse 0.8s ease-in-out infinite alternate;
+}

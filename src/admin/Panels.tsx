@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import Avatar from '../components/Avatar'
 import { POWERS } from '../data/cards'
-import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, roundConfig, TOTAL_ROUNDS } from '../lib/game'
+import { AWARD_SHOW_MS, DEFENSE_TALK_MS, DEFENSE_VOTE_MS, formatClock, roundConfig, TOTAL_ROUNDS, WAITING_HOST } from '../lib/game'
 import type { Award, PlayerInfo, PodiumStats, RoundSummary, SabotageEvent } from '../lib/types'
 import type { AdminGame, Announcement } from './useAdminGame'
 
@@ -111,10 +111,11 @@ export function DefenseView({ game, player, autoLeft }: { game: AdminGame; playe
           )}
           {d.stage !== 'result' && (
             <div className="timer">
-              <div className="timer-num">{Math.ceil(left / 1000)}</div>
+              <div className="timer-num">{left > 0 ? Math.ceil(left / 1000) : '⏳'}</div>
               <div className="timer-bar">
                 <div style={{ width: `${(left / total) * 100}%` }} />
               </div>
+              {left <= 0 && <div className="waiting-host">{WAITING_HOST}</div>}
             </div>
           )}
           {d.stage === 'result' && (
@@ -124,7 +125,7 @@ export function DefenseView({ game, player, autoLeft }: { game: AdminGame; playe
                 👍 {d.convinced} · 👎 {d.notConvinced} —{' '}
                 {ok ? `${d.name} gets the heart and points back` : `${d.name} loses 100 extra points`}
               </p>
-              <p className="auto-big">Back to the game in {Math.ceil(autoLeft / 1000)}…</p>
+              <p className="auto-big">{autoLeft > 0 ? `Back to the game in ${Math.ceil(autoLeft / 1000)}…` : WAITING_HOST}</p>
             </>
           )}
         </div>
@@ -188,7 +189,7 @@ export function RoundResults({ game, rows, autoLeft, paused }: { game: AdminGame
         )}
         <div className="re-timer next">
           {paused ? '⏸ ' : ''}
-          {`${last ? 'Awards' : 'Next'} in ${Math.ceil(autoLeft / 1000)}`}
+          {autoLeft > 0 ? `${last ? 'Awards' : 'Next'} in ${Math.ceil(autoLeft / 1000)}` : WAITING_HOST}
         </div>
       </div>
     </div>

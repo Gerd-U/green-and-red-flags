@@ -295,6 +295,9 @@ export function clamp(v: number, a: number, b: number): number {
   return Math.max(a, Math.min(b, v))
 }
 
+/** shown when a timer reaches 0: nothing moves on until the host taps Next */
+export const WAITING_HOST = 'Waiting for the host…'
+
 export function formatClock(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000))
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`

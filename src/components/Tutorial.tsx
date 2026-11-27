@@ -23,7 +23,7 @@ export default function Tutorial({ secondsLeft, compact = false }: { secondsLeft
     <div className={`tutorial ${compact ? 'compact' : ''}`}>
       <div className="tut-head">
         <h1>How to play</h1>
-        <div className="tut-timer">{secondsLeft}s</div>
+        <div className="tut-timer">{secondsLeft > 0 ? `${secondsLeft}s` : '⏳'}</div>
       </div>
       <div className="tut-controls">
         <span className="key">◀</span>

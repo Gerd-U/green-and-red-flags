@@ -861,8 +861,7 @@ export function useAdminGame(code: string) {
     if (!d || d.stage !== 'vote' || v.defenseKey !== d.key || v.id === d.playerId) return
     d.votes[v.id] = v.vote
     d.votesIn = Object.keys(d.votes).length
-    if (d.votesIn >= d.votesNeeded) resolveVote()
-    else commit()
+    commit()
   }
 
   const handleHotTakeVote = (v: HotTakeVoteMsg) => {
@@ -870,8 +869,7 @@ export function useAdminGame(code: string) {
     if (!h || h.stage !== 'vote' || v.key !== h.key || (v.vote !== 'red' && v.vote !== 'green')) return
     h.votes[v.id] = v.vote
     h.votesIn = Object.keys(h.votes).length
-    if (h.votesIn >= h.votesNeeded) htReveal()
-    else commit()
+    commit()
   }
 
   // --- host (moderator) ---
@@ -1054,7 +1052,7 @@ export function useAdminGame(code: string) {
       const now = performance.now()
       const fns = loopFns.current
       if (hostOnline && now - lastHostSeen.current > 20_000) setHostOnline(false)
-      if (s.phase === 'tutorial' && now >= s.tutorialEndsAt) return fns.startRound()
+      // only the round itself ends by time; everything else waits for the host's Next
       if (s.phase === 'playing' && s.running) {
         const t = elapsed()
         const dur = roundConfig(s.round).durationMs
@@ -1073,17 +1071,6 @@ export function useAdminGame(code: string) {
           }
         } else defenderMissingSince.current = 0
       }
-      if (s.phase === 'defense' && s.defense?.stage === 'talk' && now >= s.defense.stageEndsAt) return fns.startVote()
-      if (s.phase === 'defense' && s.defense?.stage === 'vote' && now >= s.defense.stageEndsAt) return fns.resolveVote()
-      if (s.phase === 'hotTake' && s.hotTake?.stage === 'vote' && now >= s.hotTake.stageEndsAt) return fns.htReveal()
-      if (s.phase === 'hotTake' && s.hotTake?.stage === 'speaker' && now >= s.hotTake.stageEndsAt) {
-        // speaker time is over: back to the two sides (the host decides what's next)
-        s.hotTake.stage = 'reveal'
-        s.hotTake.speaker = undefined
-        bump()
-        return broadcast()
-      }
-      if (s.auto && !s.auto.paused && now >= s.auto.endsAt) return fns.runAuto(s.auto.action)
       if (now - lastBroadcast.current > 1500) broadcast()
     }, 100)
     return () => clearInterval(id)

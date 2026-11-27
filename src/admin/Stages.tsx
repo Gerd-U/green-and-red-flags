@@ -56,7 +56,7 @@ export function HotTakeView({ h, players, left }: { h: HotTake; players: Record<
         <div className="ht-vote">
           <div className="ht-q">Red flag or green flag? Vote in secret on your phone!</div>
           <div className="timer">
-            <div className="timer-num">{Math.ceil(left / 1000)}</div>
+            <div className="timer-num">{left > 0 ? Math.ceil(left / 1000) : '⏳'}</div>
             <div className="timer-bar">
               <div style={{ width: `${(left / HOTTAKE_VOTE_MS) * 100}%` }} />
             </div>
@@ -101,7 +101,7 @@ export function HotTakeView({ h, players, left }: { h: HotTake; players: Record<
               You voted {(h.red ?? []).includes(speaker.id) ? 'RED' : 'GREEN'}. Why?
             </div>
             <div className="timer">
-              <div className="timer-num">{Math.ceil(left / 1000)}</div>
+              <div className="timer-num">{left > 0 ? Math.ceil(left / 1000) : '⏳'}</div>
               <div className="timer-bar">
                 <div style={{ width: `${(left / HOTTAKE_SPEAKER_MS) * 100}%` }} />
               </div>

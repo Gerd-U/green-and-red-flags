@@ -391,7 +391,7 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
       next = ready > 0 ? { cmd: 'start', label: `Start the game (${ready}/${playersOnline.length} ready)` } : { cmd: null, label: 'Waiting for players…' }
       break
     case 'tutorial':
-      next = { cmd: 'skip', label: 'Skip the tutorial' }
+      next = { cmd: 'skip', label: 'Start round 1' }
       break
     case 'playing':
       next = { cmd: null, label: s.running ? 'Round in progress…' : 'Paused' }

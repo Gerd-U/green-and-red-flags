@@ -5,7 +5,7 @@ import PolyBackground from '../components/PolyBackground'
 import { POWERS } from '../data/cards'
 import { randomProfileLine, sanitizeProfileLine } from '../data/profiles'
 import { randomAvatar, sanitizeAvatar } from '../lib/avatar'
-import { roundConfig, TOTAL_ROUNDS } from '../lib/game'
+import { roundConfig, TOTAL_ROUNDS, WAITING_HOST } from '../lib/game'
 import { mainTopic, normalizeCode, openChannel, playerTopic, type Room } from '../lib/room'
 import { isSfxOn, playSfx, setSfxOn, unlockAudio } from '../lib/sfx'
 import { getPlayerId, load, save } from '../lib/storage'
@@ -660,11 +660,11 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
               <p className="quote">“{defense.text}”</p>
               {defense.stage === 'talk' && (
                 <>
-                  <h2 className="shout">Defend yourself! {Math.ceil(stageLeft / 1000)}s</h2>
+                  <h2 className="shout">Defend yourself!{stageLeft > 0 ? ` ${Math.ceil(stageLeft / 1000)}s` : ''}</h2>
                   <p className="starter">Start with: “{defense.starter}”</p>
                 </>
               )}
-              {defense.stage === 'vote' && <h2 className="shout">The others are voting... {Math.ceil(stageLeft / 1000)}s</h2>}
+              {defense.stage === 'vote' && <h2 className="shout">The others are voting…</h2>}
               {defense.stage === 'result' && <DefenseResult defense={defense} mine />}
             </div>
           ) : (
@@ -673,7 +673,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
               <p className="quote">“{defense.text}”</p>
               {defense.stage === 'talk' && (
                 <h2 className="shout">
-                  Listen to {defense.name}&apos;s defense... {Math.ceil(stageLeft / 1000)}s
+                  Listen to {defense.name}.{stageLeft > 0 ? ` ${Math.ceil(stageLeft / 1000)}s` : ''}
                 </h2>
               )}
               {defense.stage === 'vote' &&
@@ -681,7 +681,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
                   <h2 className="shout">Vote sent! ✔</h2>
                 ) : (
                   <div className="vote-buttons">
-                    <div className="vote-timer">{Math.ceil(stageLeft / 1000)}s to vote</div>
+                    <div className="vote-timer">{stageLeft > 0 ? `${Math.ceil(stageLeft / 1000)}s to vote` : 'Vote now!'}</div>
                     <button className="btn btn-green btn-huge" onClick={() => vote('convinced')}>
                       👍 Convinced
                     </button>
@@ -696,7 +696,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
           {state?.auto && (
             <div className="auto-line">
               {state.auto.paused ? '⏸ ' : ''}
-              {state.auto.label} in {Math.ceil(autoLeft / 1000)}s
+              {autoLeft > 0 ? `${state.auto.label} in ${Math.ceil(autoLeft / 1000)}s` : WAITING_HOST}
             </div>
           )}
         </div>
@@ -714,7 +714,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
               </h2>
             ) : (
               <div className="vote-buttons">
-                <div className="vote-timer">Red or green? {Math.ceil(htLeft / 1000)}s</div>
+                <div className="vote-timer">Red or green?{htLeft > 0 ? ` ${Math.ceil(htLeft / 1000)}s` : ''}</div>
                 <button className="btn btn-red btn-huge" onClick={() => voteHotTake('red')}>
                   🟥 RED FLAG
                 </button>
@@ -765,7 +765,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
           {state.auto && (
             <div className="auto-line">
               {state.auto.paused ? '⏸ ' : ''}
-              {state.auto.label} in {Math.ceil(autoLeft / 1000)}s
+              {autoLeft > 0 ? `${state.auto.label} in ${Math.ceil(autoLeft / 1000)}s` : WAITING_HOST}
             </div>
           )}
         </div>
