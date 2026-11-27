@@ -4466,9 +4466,10 @@ html.host-page .screen {
   color: #fff;
   font-weight: 800;
 }
+/* slide + pop only (never starts invisible, so an entry is readable even if the animation is paused) */
 @keyframes feedIn {
-  from { transform: translateY(-40%); opacity: 0; }
-  to { transform: none; }
+  from { transform: translateY(-35%) scale(0.94); filter: brightness(1.8); }
+  to { transform: none; filter: none; }
 }
 
 /* controls panel: small, bottom-left corner, only while the mouse moves (or H) */

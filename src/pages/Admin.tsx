@@ -271,8 +271,9 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
               gameSeed={game.gameSeed}
             />
             <aside className="proj-rank">
-              <div className="proj-label">Ranking</div>
-              <Ranking rows={rows} compact dense />
+              <div className="proj-label">{rows.length > 5 ? 'Top 5' : 'Ranking'}</div>
+              {/* top 5 only: every mini screen already shows its score, and the feed needs the room */}
+              <Ranking rows={rows.slice(0, 5)} compact dense />
               <LiveFeed feed={feed} players={gamePlayers} seed={game.seed} round={game.round} gameSeed={game.gameSeed} />
             </aside>
           </div>
