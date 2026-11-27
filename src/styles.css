@@ -4178,21 +4178,28 @@ html.host-page .screen {
   font-size: 18px;
 }
 
-/* projector demo bots: tiny frames in a corner, nearly invisible */
+/* projector demo bots: each frame is a real phone size (so the game field has
+   a phone's shape and the same collisions), shrunk and stacked in one corner,
+   nearly invisible (inside the viewport, so the browser keeps them running) */
 .demo-bots {
   position: fixed;
   left: 0;
   bottom: 0;
-  display: flex;
-  gap: 2px;
+  width: 90px;
+  height: 185px;
   opacity: 0.02;
   pointer-events: none;
   z-index: 1;
 }
 .demo-bots iframe {
-  width: 90px;
-  height: 180px;
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 360px;
+  height: 740px;
   border: 0;
+  transform: scale(0.25);
+  transform-origin: bottom left;
 }
 
 /* phone overlays (round results, votes...): never cut on short screens, scroll instead */

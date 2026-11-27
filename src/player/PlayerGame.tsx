@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { buzz } from '../lib/buzz'
+import { cardRoll, hashId, makePersona } from './botPersona'
 import Avatar from '../components/Avatar'
 import RoundBackdrop from '../components/RoundBackdrop'
 import { POWERS } from '../data/cards'
@@ -120,6 +121,10 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
     c.seq = state.seq
   }, [state.seq, state.elapsed, state.running])
 
+  // bots: each one plays in its own way (see botPersona.ts)
+  const persona = useMemo(() => makePersona(me), [me])
+  const personaSeed = useMemo(() => hashId(me), [me])
+
   // --- simulation state ---
   const sim = useRef({
     x: 0.5,
@@ -140,6 +145,8 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
     dashUntil: 0,
     dashDir: 0,
     dashReadyAt: 0,
+    botThinkAt: 0,
+    botTarget: 0.5,
     lastGame: now(),
     lastReal: performance.now(),
     lastTick: 0,
@@ -271,7 +278,8 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
       const s = sim.current
       const p = props.current
       const realNow = performance.now()
-      const realDt = Math.min(64, realNow - s.lastReal)
+      // same cap as the cards (100 ms): on a slow phone you walk as fast as they fall
+      const realDt = Math.min(100, realNow - s.lastReal)
       s.lastReal = realNow
       const game = Math.min(now(), cfg.durationMs)
       const dt = clamp(game - s.lastGame, 0, 100)
@@ -308,27 +316,52 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
 
       const { bodyTop, bodyBottom } = bodyBox(aspect.current)
 
-      // dev bot: pick the x that catches greens and avoids reds in the next
-      // rows (and make a mistake on ~1 card out of 5)
+      // bot: pick the x that catches greens and avoids reds in the next cards,
+      // with its own personality (reaction, mistakes, grey cards, laziness, dash)
       if (bot) {
-        const near = s.active.filter((a) => a.y < bodyBottom && a.y > 0.15)
-        let best = s.x
-        let bestV = -Infinity
-        for (let x = PLAYER_W / 2; x <= 1 - PLAYER_W / 2; x += 0.03) {
-          let v = -Math.abs(x - s.x) * 0.6
-          for (const a of near) {
-            if (Math.abs(a.card.x - x) >= HIT_DX + 0.02) continue
-            const good = a.card.kind !== 'red' && a.card.kind !== 'ick'
-            const dumb = (a.card.id * 7 + round) % 5 === 0
-            v += (good !== dumb ? 1 : -1.6) * (0.4 + a.y)
+        const P = persona
+        if (realNow >= s.botThinkAt) {
+          s.botThinkAt = realNow + P.thinkMs
+          // a card matters until its top edge has passed the body
+          const near = s.active.filter((a) => a.y - CARD_H / 2 < bodyBottom && a.y > P.noticeY)
+          const seen = near.map((a) => {
+            let good = a.card.kind !== 'red' && a.card.kind !== 'ick'
+            // grey card not shown yet: a guess, right only greyRead of the time
+            if (!a.revealed && cardRoll(personaSeed, a.card.id, 1) > P.greyRead) good = !good
+            if (cardRoll(personaSeed, a.card.id, 2) < P.mistakes) good = !good
+            return { a, good, now: a.y + CARD_H / 2 >= bodyTop - 0.03 }
+          })
+          let best = s.x
+          let bestV = -Infinity
+          for (let x = PLAYER_W / 2; x <= 1 - PLAYER_W / 2; x += 0.03) {
+            let v = -Math.abs(x - s.x) * P.laziness
+            for (const { a, good, now: atBody } of seen) {
+              // don't walk through a bad card that is already at body height
+              if (!good && atBody) {
+                const lo = Math.min(s.x, x)
+                const hi = Math.max(s.x, x)
+                if (hi > a.card.x - HIT_DX && lo < a.card.x + HIT_DX) v -= 3
+                continue
+              }
+              if (Math.abs(a.card.x - x) >= HIT_DX + 0.02) continue
+              v += (good ? 1 : -1.6) * (0.4 + a.y)
+            }
+            if (v > bestV) {
+              bestV = v
+              best = x
+            }
           }
-          if (v > bestV) {
-            bestV = v
-            best = x
+          s.botTarget = best
+          // far away and in a hurry: dash (some bots never do)
+          const far = best - s.x
+          if (Math.abs(far) > 0.3 && realNow >= s.dashReadyAt && !broken && Math.random() < P.dashy) {
+            s.dashUntil = realNow + DASH_MS
+            s.dashDir = far > 0 ? 1 : -1
+            s.dashReadyAt = realNow + DASH_COOLDOWN_MS
           }
         }
-        input.current.left = best < s.x - 0.02
-        input.current.right = best > s.x + 0.02
+        input.current.left = s.botTarget < s.x - P.slop
+        input.current.right = s.botTarget > s.x + P.slop
       }
 
       // movement
