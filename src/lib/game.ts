@@ -41,7 +41,7 @@ export const ROUNDS: RoundConfig[] = [
   {
     name: 'First Date',
     durationMs: 75_000,
-    fallMs: [5300, 4500],
+    fallMs: [6625, 5625],
     greyRatio: 0,
     sabotageFromMs: 15_000,
     pointsMult: 1,
@@ -51,7 +51,7 @@ export const ROUNDS: RoundConfig[] = [
   {
     name: 'Getting Serious',
     durationMs: 75_000,
-    fallMs: [4900, 4100],
+    fallMs: [6125, 5125],
     greyRatio: 0.5,
     sabotageFromMs: 5_000,
     pointsMult: 1,
@@ -61,7 +61,7 @@ export const ROUNDS: RoundConfig[] = [
   {
     name: 'Meet the Parents',
     durationMs: 75_000,
-    fallMs: [4500, 3700],
+    fallMs: [5625, 4625],
     greyRatio: 1,
     sabotageFromMs: 5_000,
     pointsMult: 2,
@@ -128,8 +128,8 @@ export const comboMult = (streak: number) => COMBO_MULTS[Math.min(streak, COMBO_
 export const MAX_STREAK_LEVEL = COMBO_MULTS.length - 1
 
 // ---- cards per round ----
-export const GREENS_PER_ROUND = 14
-export const REDS_PER_ROUND = 14
+export const GREENS_PER_ROUND = 12
+export const REDS_PER_ROUND = 12
 export const POWERS_PER_ROUND = 3
 export const ICKS_PER_ROUND = 3
 export const MAX_SOULMATES_PER_ROUND = 2
@@ -158,7 +158,7 @@ export const SPAWN_Y = 0.02
  */
 export const HIT_DX = CARD_W / 2 + PLAYER_BODY_W / 2 - 0.01
 /** time to see the next card and start moving (used for the minimum gap between cards) */
-export const REACTION_MS = 350
+export const REACTION_MS = 450
 
 /**
  * Minimum time between two cards reaching the player's line, so that from the
