@@ -505,6 +505,8 @@ export function useAdminGame(code: string) {
   const startGame = () => {
     const s = g.current
     if (s.phase !== 'lobby' && s.phase !== 'intro') return
+    // nobody ready yet: nothing to start (same rule as the projector's button)
+    if (!Object.values(s.players).some((p) => p.online && p.ready)) return
     g.current = freshGame(s)
     g.current.gameSeed = randomSeed()
     g.current.phase = 'tutorial'
