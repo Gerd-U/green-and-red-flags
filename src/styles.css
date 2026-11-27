@@ -4504,3 +4504,63 @@ html.host-page .screen {
   -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent);
   mask-image: linear-gradient(to bottom, #000 78%, transparent);
 }
+
+/* =================================================================
+   v6: display font (Baloo 2, 800) for cards, titles and big numbers
+   ================================================================= */
+:root {
+  --font-display: 'Baloo 2', var(--font);
+}
+h1,
+h2,
+.title,
+.title-sm,
+.wait-title,
+.ptut-title,
+.shout,
+.big-score,
+.big-place,
+.hud-score strong,
+.hud-time,
+.countdown-big span,
+.timer-num,
+.proj-logo,
+.proj-time,
+.join-code,
+.proj-code,
+.rank-score,
+.pm-score,
+.host-next-what,
+.host-clock,
+.defense-name,
+.podium-score,
+.award-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+/* falling cards: bigger, white letters with a dark outline (readable on any color) */
+.fcard {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(15px, 4.3vw, 19px);
+  line-height: 0.98;
+  letter-spacing: 0;
+  padding: 2px 5px;
+  color: #fff;
+  --ol: #1b1030;
+  text-shadow:
+    -1.5px -1.5px 0 var(--ol), 1.5px -1.5px 0 var(--ol), -1.5px 1.5px 0 var(--ol), 1.5px 1.5px 0 var(--ol),
+    0 -2px 0 var(--ol), 0 2px 0 var(--ol), -2px 0 0 var(--ol), 2px 0 0 var(--ol), 0 3px 0 var(--ol);
+}
+.fcard.green,
+.fcard.grey,
+.fcard.soulmate,
+.fcard.power {
+  color: #fff;
+}
+.fcard-text {
+  padding-top: 0.08em; /* Baloo sits a little high */
+}
+.fcard .fcard-text {
+  -webkit-line-clamp: 3;
+}

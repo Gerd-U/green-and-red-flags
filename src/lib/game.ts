@@ -33,8 +33,6 @@ export interface RoundConfig {
   sabotageFromMs: number
   /** every point is multiplied by this */
   pointsMult: number
-  /** chance that a row brings two cards at once */
-  pairChance: number
   theme: 'restaurant' | 'apartment' | 'dining'
   tagline: string
 }
@@ -47,7 +45,6 @@ export const ROUNDS: RoundConfig[] = [
     greyRatio: 0,
     sabotageFromMs: 15_000,
     pointsMult: 1,
-    pairChance: 0.35,
     theme: 'restaurant',
     tagline: 'Every card shows its true color. Take it easy!',
   },
@@ -58,7 +55,6 @@ export const ROUNDS: RoundConfig[] = [
     greyRatio: 0.5,
     sabotageFromMs: 5_000,
     pointsMult: 1,
-    pairChance: 0.45,
     theme: 'apartment',
     tagline: 'Half the cards are grey. Read before you catch!',
   },
@@ -69,7 +65,6 @@ export const ROUNDS: RoundConfig[] = [
     greyRatio: 1,
     sabotageFromMs: 5_000,
     pointsMult: 2,
-    pairChance: 0.55,
     theme: 'dining',
     tagline: 'All cards are grey, faster, and points count double!',
   },
@@ -146,8 +141,8 @@ export const DASH_MS = 130
 export const DASH_COOLDOWN_MS = 1200
 
 // ---- field geometry (normalized: x by width, y by height) ----
-export const CARD_W = 0.31
-export const CARD_H = 0.09
+export const CARD_W = 0.36
+export const CARD_H = 0.11
 export const PLAYER_Y = 0.82
 /** width of the avatar box; the drawn body is ~50% of it (measured in the DOM) */
 export const PLAYER_W = 0.25
@@ -162,8 +157,15 @@ export const SPAWN_Y = 0.02
  * so a card that visually missed you never counts.
  */
 export const HIT_DX = CARD_W / 2 + PLAYER_BODY_W / 2 - 0.01
-/** minimum free gap between two cards of the same row (the body fits through) */
-export const ROW_GAP = PLAYER_BODY_W + 0.06
+/** time to see the next card and start moving (used for the minimum gap between cards) */
+export const REACTION_MS = 350
+
+/**
+ * Minimum time between two cards reaching the player's line, so that from the
+ * first one you can always get to (or away from) the next: reaction time plus
+ * walking (no dash) the horizontal distance between them.
+ */
+export const minCardGapMs = (dx: number) => REACTION_MS + Math.abs(dx) / MOVE_SPEED
 
 /**
  * Builds the cards of one round. The deck order comes from `gameSeed`
@@ -171,9 +173,9 @@ export const ROW_GAP = PLAYER_BODY_W + 0.06
  * timing/positions from the round `seed`. Same seeds => same cards, same
  * order, same timing on every phone.
  *
- * Cards come in rows: one card, or two cards at the same moment with a gap
- * between them wide enough to dodge. Rows are far enough apart that never
- * more than 2 cards share the same horizontal band.
+ * One card at a time (never two in the same row), evenly spread over the
+ * round, and never closer than minCardGapMs(): you can always walk from one
+ * card to the next.
  */
 export function buildSchedule(seed: number, round: number, gameSeed: number): ScheduledCard[] {
   const cfg = roundConfig(round)
@@ -194,84 +196,72 @@ export function buildSchedule(seed: number, round: number, gameSeed: number): Sc
   for (let i = 0; i < Math.min(soulCount, MAX_SOULMATES_PER_ROUND); i++) kinds.push('soulmate')
   const order = shuffled(kinds, rand)
 
-  // group into rows of 1 or 2 (power / soulmate always alone)
-  const rows: CardKind[][] = []
-  for (let i = 0; i < order.length; ) {
-    const a = order[i]
-    const b = order[i + 1]
-    const solo = (k: CardKind) => k === 'power' || k === 'soulmate'
-    if (b && !solo(a) && !solo(b) && rand() < cfg.pairChance) {
-      rows.push([a, b])
-      i += 2
-    } else {
-      rows.push([a])
-      i += 1
-    }
-  }
-
   // even spacing with a bit of jitter
   const start = 1200
   const end = cfg.durationMs - 3500
-  const step = (end - start) / rows.length
-  const times = rows.map((_, i) => start + i * step + (rand() - 0.5) * step * 0.35)
+  const step = (end - start) / order.length
+  const times = order.map((_, i) => start + i * step + (rand() - 0.5) * step * 0.35)
 
-  // power cards can't appear before sabotageFromMs: swap their row with a later one
-  for (let i = 0; i < rows.length; i++) {
-    if (!rows[i].includes('power') || times[i] >= cfg.sabotageFromMs) continue
-    const j = rows.findIndex((r, idx) => idx > i && !r.includes('power') && times[idx] >= cfg.sabotageFromMs)
-    if (j > 0) [rows[i], rows[j]] = [rows[j], rows[i]]
+  // power cards can't appear before sabotageFromMs: swap with a later card
+  for (let i = 0; i < order.length; i++) {
+    if (order[i] !== 'power' || times[i] >= cfg.sabotageFromMs) continue
+    const j = order.findIndex((k, idx) => idx > i && k !== 'power' && times[idx] >= cfg.sabotageFromMs)
+    if (j > 0) [order[i], order[j]] = [order[j], order[i]]
   }
 
   const minX = CARD_W / 2
   const span = 1 - CARD_W
+  const fallAt = (t: number) => cfg.fallMs[0] + (cfg.fallMs[1] - cfg.fallMs[0]) * (t / cfg.durationMs)
+
+  // positions, then push a card later when it would arrive too soon after the previous one
+  const xs: number[] = []
+  let lastX = 0.5
+  for (let i = 0; i < order.length; i++) {
+    let x = minX + rand() * span
+    if (Math.abs(x - lastX) < 0.12) x = x > 0.5 ? x - 0.22 : x + 0.22
+    x = Math.max(minX, Math.min(1 - minX, x))
+    xs.push(x)
+    lastX = x
+    if (i === 0) continue
+    const need = minCardGapMs(x - xs[i - 1])
+    const prevArrive = times[i - 1] + fallAt(times[i - 1])
+    for (let k = 0; k < 3; k++) {
+      const gap = times[i] + fallAt(times[i]) - prevArrive
+      if (gap >= need) break
+      times[i] += need - gap + 5
+    }
+  }
+
   const cards: ScheduledCard[] = []
   let gi = r0 * GREENS_PER_ROUND
   let ri = r0 * REDS_PER_ROUND
   let ii = r0 * ICKS_PER_ROUND
   let si = r0 * MAX_SOULMATES_PER_ROUND
-  let lastX = 0.5
-  let id = 0
-  rows.forEach((row, rowIdx) => {
-    const t = times[rowIdx]
-    const p = t / cfg.durationMs
-    const fallMs = cfg.fallMs[0] + (cfg.fallMs[1] - cfg.fallMs[0]) * p
-    const speed = (1 - SPAWN_Y + CARD_H) / fallMs
-    let xs: number[]
-    if (row.length === 2) {
-      // two cards: leave at least ROW_GAP free between them
-      const need = CARD_W + ROW_GAP
-      const x1 = minX + rand() * (span - need)
-      const x2 = x1 + need + rand() * (span - need - (x1 - minX))
-      xs = rand() < 0.5 ? [x1, x2] : [x2, x1]
-    } else {
-      let x = minX + rand() * span
-      if (Math.abs(x - lastX) < 0.12) x = x > 0.5 ? x - 0.22 : x + 0.22
-      xs = [x]
+  order.forEach((kind, i) => {
+    const t = times[i]
+    if (t > end) return // pushed past the end of the round: drop it
+    const speed = (1 - SPAWN_Y + CARD_H) / fallAt(t)
+    const card: ScheduledCard = { id: cards.length, t, x: xs[i], kind, speed }
+    const set = (c: { short: string; full?: string }) => {
+      card.text = c.short
+      card.full = fullText(c)
     }
-    lastX = xs[0]
-    row.forEach((kind, k) => {
-      const card: ScheduledCard = { id: id++, t, x: Math.max(minX, Math.min(1 - minX, xs[k])), kind, speed }
-      const set = (c: { short: string; full?: string }) => {
-        card.text = c.short
-        card.full = fullText(c)
-      }
-      if (kind === 'green') {
-        set(greens[gi++ % greens.length])
-        card.grey = rand() < cfg.greyRatio
-      } else if (kind === 'red') {
-        set(reds[ri++ % reds.length])
-        card.grey = rand() < cfg.greyRatio
-      } else if (kind === 'ick') {
-        set(icks[ii++ % icks.length])
-      } else if (kind === 'soulmate') {
-        set(souls[si++ % souls.length])
-      } else {
-        // therapy (shield) is a bit rarer than the sabotages
-        const pool: PowerId[] = [...POWER_IDS.filter((pw) => pw !== 'therapy'), 'therapy']
-        card.power = pool[Math.floor(rand() * pool.length)]
-      }
-      cards.push(card)
-    })
+    if (kind === 'green') {
+      set(greens[gi++ % greens.length])
+      card.grey = rand() < cfg.greyRatio
+    } else if (kind === 'red') {
+      set(reds[ri++ % reds.length])
+      card.grey = rand() < cfg.greyRatio
+    } else if (kind === 'ick') {
+      set(icks[ii++ % icks.length])
+    } else if (kind === 'soulmate') {
+      set(souls[si++ % souls.length])
+    } else {
+      // therapy (shield) is a bit rarer than the sabotages
+      const pool: PowerId[] = [...POWER_IDS.filter((pw) => pw !== 'therapy'), 'therapy']
+      card.power = pool[Math.floor(rand() * pool.length)]
+    }
+    cards.push(card)
   })
   return cards
 }

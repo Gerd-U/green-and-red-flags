@@ -585,7 +585,6 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
                 </>
               ) : (
                 <>
-                  {ICON[look] && <span className="fcard-icon">{ICON[look]}</span>}
                   <span className="fcard-text">{c.text}</span>
                 </>
               )}
@@ -697,10 +696,6 @@ function bodyBox(aspect: number) {
 
 const KIND_CODE = { green: 'g', red: 'r', power: 'p', ick: 'i', soulmate: 's' } as const
 
-const ICON: Record<string, string> = {
-  ick: '🤢',
-  soulmate: '★',
-}
 
 const BURST_CHAR: Record<Burst['kind'], string> = {
   green: '♥',
