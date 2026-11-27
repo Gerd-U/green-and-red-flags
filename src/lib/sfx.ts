@@ -1,4 +1,4 @@
-// All sounds are synthesized with Web Audio: no audio files.
+// All game sounds are synthesized with Web Audio (the music lives in music.ts).
 import { load, save } from './storage'
 
 export type Sfx =
@@ -39,6 +39,12 @@ function ac(): AudioContext | null {
   return ctx
 }
 
+/** The shared audio context and master volume (for music.ts). */
+export function getAudio(): { ctx: AudioContext; master: GainNode } | null {
+  const c = ac()
+  return c && master ? { ctx: c, master } : null
+}
+
 /** Browsers only allow audio after a user gesture: call this on the first tap/click. */
 export function unlockAudio() {
   const c = ac()
@@ -59,7 +65,6 @@ export function setSfxOn(v: boolean) {
 export function setMusicOn(v: boolean) {
   musicOn = v
   save(MUSIC_KEY, v)
-  if (!v) stopMusic()
 }
 
 // ---- tiny synth helpers ----
@@ -194,74 +199,4 @@ export function cueDing(kind: 'speak' | 'act' | 'warn') {
   } else {
     ;[0, 0.14, 0.28].forEach((d) => tone(N(7), t + d, 0.1, 'triangle', 0.06))
   }
-}
-
-// ---- background music (projector only): a simple chiptune loop ----
-let musicTimer: number | null = null
-let musicGain: GainNode | null = null
-let step = 0
-let nextTime = 0
-let tempo = 112
-
-// I - vi - IV - V in C
-const CHORDS = [
-  [0, 4, 7],
-  [-3, 0, 4],
-  [-7, -3, 0],
-  [-5, -1, 2],
-]
-
-export function startMusic(bpm = 112) {
-  tempo = bpm
-  if (!musicOn) return
-  const c = ac()
-  if (!c || !master || musicTimer !== null) return
-  musicGain = c.createGain()
-  musicGain.gain.value = 0.22
-  musicGain.connect(master)
-  nextTime = c.currentTime + 0.1
-  step = 0
-  musicTimer = window.setInterval(() => {
-    if (!ctx || !musicGain) return
-    if (ctx.state !== 'running') {
-      nextTime = ctx.currentTime + 0.1
-      return
-    }
-    const eighth = 60 / tempo / 2
-    while (nextTime < ctx.currentTime + 0.15) {
-      const bar = Math.floor(step / 8) % CHORDS.length
-      const chord = CHORDS[bar]
-      const i = step % 8
-      // bass on beats
-      if (i % 2 === 0) tone(N(chord[0] - 12), nextTime, eighth * 1.6, 'triangle', 0.35, undefined, musicGain)
-      // arpeggio
-      const note = chord[[0, 1, 2, 1, 0, 1, 2, 1][i]] + (i >= 4 ? 12 : 0)
-      tone(N(note + 12), nextTime, eighth * 0.8, 'square', 0.09, undefined, musicGain)
-      // hi-hat
-      if (i % 2 === 1) noise(nextTime, 0.03, 0.03, 8000)
-      nextTime += eighth
-      step++
-    }
-  }, 30)
-}
-
-export function setMusicTempo(bpm: number) {
-  tempo = bpm
-}
-
-/** Lower the music (e.g. while someone is defending). */
-export function duckMusic(on: boolean) {
-  if (!musicGain || !ctx) return
-  musicGain.gain.setTargetAtTime(on ? 0.04 : 0.22, ctx.currentTime, 0.2)
-}
-
-export function stopMusic() {
-  if (musicTimer !== null) window.clearInterval(musicTimer)
-  musicTimer = null
-  try {
-    musicGain?.disconnect()
-  } catch {
-    /* ignore */
-  }
-  musicGain = null
 }

@@ -7,7 +7,8 @@ import Tutorial from '../components/Tutorial'
 import { AWARD_SHOW_MS, COUNTDOWN_MS, formatClock, roundConfig, START_HEARTS, TOTAL_ROUNDS } from '../lib/game'
 import { makeRoomCode } from '../lib/room'
 import { DEMO_NAMES } from './Play'
-import { duckMusic, isMusicOn, isSfxOn, playSfx, setMusicOn, setMusicTempo, setSfxOn, startMusic, stopMusic, unlockAudio } from '../lib/sfx'
+import { duckMusic, setMusicBoost, setMusicStyle, startMusic, stopMusic, type MusicStyle } from '../lib/music'
+import { isMusicOn, isSfxOn, playSfx, setMusicOn, setSfxOn, unlockAudio } from '../lib/sfx'
 import LiveFeed from '../admin/LiveFeed'
 import LiveGrid from '../admin/LiveGrid'
 import { Announcer, AwardsShow, DefenseView, Lobby, Podium, Ranking, RoundResults, SabotageAnim, type RankRow } from '../admin/Panels'
@@ -123,8 +124,17 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
       stopMusic()
     }
   }, [])
-  const bpm = game.phase === 'intro' || game.phase === 'lobby' || game.phase === 'tutorial' ? 100 : [108, 120, 134][Math.max(0, game.round - 1)] ?? 112
-  useEffect(() => setMusicTempo(bpm), [bpm])
+  // one music style per part of the game (Latin pop, dembow, dance pop, electro, celebration)
+  const musicStyle: MusicStyle =
+    game.phase === 'intro' || game.phase === 'lobby' || game.phase === 'tutorial'
+      ? 'lobby'
+      : game.phase === 'awards' || game.phase === 'podium' || game.phase === 'final'
+        ? 'podium'
+        : (`round${Math.min(3, Math.max(1, game.round))}` as MusicStyle)
+  useEffect(() => setMusicStyle(musicStyle), [musicStyle])
+  // the last 10 seconds of round 3: the music gets more intense
+  const musicBoost = game.phase === 'playing' && game.round >= 3 && timeLeft <= 10
+  useEffect(() => setMusicBoost(musicBoost), [musicBoost])
   const talking = game.phase === 'defense' && game.defense?.stage !== 'result'
   const discussing = game.phase === 'roundEnd' || game.phase === 'hotTake' || game.phase === 'final' || game.phase === 'intro'
   useEffect(() => duckMusic(talking || discussing), [talking, discussing])
@@ -354,7 +364,8 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
               unlockAudio()
               setMusicOn(!musicOn)
               setMusic(!musicOn)
-              if (!musicOn) startMusic(bpm)
+              if (musicOn) stopMusic()
+              else startMusic()
             },
             musicOn ? 'ghost' : 'ghost off'
           )}
