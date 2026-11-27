@@ -40,7 +40,9 @@ Los cues están en `src/host/cues.ts`: ahí se puede cambiar el texto de cada un
 
 ### El proyector
 
-Arriba: el logo, la ronda con el tiempo grande y el reloj de la actividad. Abajo: el código de sala, la URL corta y un QR pequeño (en la intro y el lobby el QR va grande en el centro). Mientras el host está conectado, los botones del proyector están escondidos; si muevo el mouse o presiono **H** aparecen 4 segundos en la esquina de abajo a la derecha. Si no hay host conectado, el panel se ve siempre (se puede jugar sin celular de host). **New room…** está en ese panel y pide confirmación.
+Arriba: el logo, la ronda con el tiempo grande y el reloj de la actividad. Abajo: el código de sala, la URL corta y un QR pequeño (en la intro y el lobby el QR va grande en el centro). Los botones del proyector están escondidos para que nunca tapen el juego: si muevo el mouse o presiono **H** aparecen 4 segundos en un panel chico en la esquina de abajo a la izquierda (se puede jugar sin celular de host usando ese panel). **New room…** está ahí y pide confirmación.
+
+Durante la ronda, cada jugador tiene una pantallita con forma de celular y el borde de su color: arriba su cabeza, nombre y puntaje; abajo sus corazones. El combo aparece como un badge (x2, x3) solo cuando llega a x2. Las tarjetas se ven con su color pero sin texto, porque son muy chicas para leer. Las pantallitas se ordenan centradas: hasta 4 en una fila, y con más jugadores en dos filas (5 = 3 + 2, 6 = 3 + 3, 7 = 4 + 3, 9 = 5 + 4). A la derecha está el top 5 y debajo el **Live feed** con los últimos 5 eventos en letra grande ("Zoe caught 🚩 Gets jealous of your friends", "Mia used GASLIGHTING on Ana"): ahí la clase lee las situaciones.
 
 En mi celular arriba veo el reloj de la actividad, en qué parte vamos y si voy "On time" o atrasado según el plan. Faltando 3 minutos para los 30 sale un aviso rojo. Debajo está el **guion**: lo que digo (Say) y una pregunta para hacer (Ask). Las preguntas usan nombres y tarjetas reales de la partida; con ◀ ▶ veo otra y con **Shuffle** cambio por una de otra persona. El switch **Show script** del menú ⚙️ lo esconde si solo quiero los botones.
 
@@ -70,7 +72,7 @@ El proyector también tiene todos los botones, por si el host no está conectado
 
 ## Reglas
 
-- **Tarjetas**: pequeñas, con máximo 5 palabras. Cuando alguien atrapa una, la frase completa aparece grande 1 segundo en su celular y en su pantalla del proyector. Caen en filas de 1 o 2 tarjetas, siempre con un hueco para esquivar.
+- **Tarjetas**: máximo 5 palabras, en letra Baloo 2 blanca con borde oscuro para que se lea sobre cualquier color. Caen de a una (nunca dos en la misma fila) y siempre con tiempo para caminar de una a la siguiente: la distancia mínima se calcula con la velocidad del personaje y la de caída. Si dos tarjetas pasan juntas por la altura del personaje, siempre queda un lugar para esquivar las dos. Cuando alguien atrapa una, la frase completa aparece grande 1 segundo en su celular.
 - **Green flag** atrapada: +100. Cada green seguida sube el combo (x1, x1.5, x2, x3). Una red lo reinicia.
 - **Red flag** atrapada: −75 y se pierde un corazón.
 - **Green que se deja pasar**: −25.
@@ -136,7 +138,9 @@ Para revisar cómo se ve en distintos celulares está `/dev/phones?room=ABCD`: m
 
 En el panel escondido del proyector (mover el mouse o presionar **H**) está el botón **Demo: add 3 bots**. Agrega 3 jugadores que juegan solos, con nombre y personaje al azar y la etiqueta **BOT** en el lobby, en las pantallas y en el ranking. Se puede tocar varias veces (hasta 9 bots). **Remove bots** los saca.
 
-Funciona en producción (Vercel con Supabase), no solo en `npm run dev`: cada bot es la página normal del jugador abierta en un cuadrito casi invisible en una esquina del proyector, con el mismo piloto automático que usa `/dev/bots`. Por eso los bots solo juegan mientras la página del proyector está abierta y visible.
+Funciona en producción (Vercel con Supabase), no solo en `npm run dev`: cada bot es la página normal del jugador, abierta en tamaño de celular (360×740), achicada y casi invisible en una esquina del proyector, con el mismo piloto automático que usa `/dev/bots`. Por eso los bots solo juegan mientras la página del proyector está abierta y visible.
+
+Cada bot tiene su propia forma de jugar, sacada de su id al azar: qué tan rápido reacciona, qué tan lejos mira, cuántas veces se equivoca, qué tan bien adivina las grises, si le da pereza caminar lejos y si usa el Dash. Así no se mueven todos igual y el ensayo se parece a una partida de verdad (en la ronda 1 atrapan casi todas las verdes; en las grises se equivocan más, como la gente).
 
 ## Ensayar antes de la clase
 
@@ -146,6 +150,22 @@ Funciona en producción (Vercel con Supabase), no solo en `npm run dev`: cada bo
 4. Al final toco **Remove bots** y **New room…** para que la clase empiece con una sala limpia.
 
 Para probar el modo demo en la compu sin Supabase: con `VITE_LOCAL_REALTIME=1` en `.env.local` corro `npm run build` y `npm run preview`, y abro `http://localhost:4173/admin`. Esa variable nunca va en Vercel (`.env.local` no se sube al repo).
+
+## Música
+
+La música del proyector se genera con Web Audio (batería, bajo, acordes suaves y una melodía corta con eco), con un estilo por parte:
+
+| Parte | Estilo |
+| --- | --- |
+| Intro, lobby y tutorial | pop latino tranquilo, 95 BPM |
+| Ronda 1 "First Date" | reguetón (dembow), 95 BPM |
+| Ronda 2 "Getting Serious" | dance pop, 118 BPM |
+| Ronda 3 "Meet the Parents" | electro, 128 BPM, que sube de energía en los últimos 10 segundos |
+| Premios, podio y Final thoughts | celebración, 120 BPM |
+
+La música baja sola durante las defensas, el Hot Take, los resultados, la intro y Final thoughts (cuando hablo yo). El botón **🎵 Music** del panel la apaga o la prende.
+
+Para usar canciones de verdad, se ponen en `public/music/` con estos nombres: `lobby.mp3`, `round1.mp3`, `round2.mp3`, `round3.mp3` y `podium.mp3`. Si un archivo existe se usa ese (con un fade entre canciones); si no, suena la generada para esa parte. Pueden ser canciones de Pixabay Music u otra fuente sin derechos de autor. No hay que subir al repo canciones con copyright.
 
 ## Crear el proyecto en Supabase
 
