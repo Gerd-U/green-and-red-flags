@@ -55,7 +55,7 @@ Con `VITE_LOCAL_REALTIME=1` en `.env` (o `.env.local`), abrí:
 http://localhost:5173/dev/bots?room=ABCD&n=7&admin=1&host=1
 ```
 
-Arriba se ve el proyector y el celular del host (que entra solo con la contraseña), y abajo 7 bots que juegan, votan y mandan sabotajes. Con `&aw=1280&ah=720` o `&aw=1920&ah=1080` se elige el tamaño del proyector. En modo dev, cada cue del host se registra en la consola como `[cue] SPEAK intro - …`. El código `room=` tiene que ser el que muestra el proyector. Esta página solo existe con `npm run dev`.
+Arriba se ve el proyector y el celular del host (que entra solo con la contraseña), y abajo 7 bots que juegan, votan y mandan sabotajes. Con `&aw=1280&ah=720` o `&aw=1920&ah=1080` se elige el tamaño del proyector. El código `room=` tiene que ser el que muestra el proyector. Esta página solo existe con `npm run dev`.
 
 Para probar a mano varios jugadores en un navegador: `/play?room=ABCD&pid=2`, `/play?room=ABCD&pid=3`, etc.
 
