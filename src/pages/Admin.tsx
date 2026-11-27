@@ -184,7 +184,7 @@ function AdminRoom({ code, onNewRoom }: { code: string; onNewRoom: () => void })
   })
 
   const confirmNewRoom = () => {
-    if (window.confirm('Start a brand new room? Players will need the new code.')) onNewRoom()
+    if (window.confirm('Make a new room? Players need the new code.')) onNewRoom()
   }
 
   // ---- overlays: only one at a time, never over a results screen ----

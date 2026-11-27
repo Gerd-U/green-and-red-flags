@@ -446,7 +446,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
       if (DOE && typeof DOE.requestPermission === 'function') {
         const res = await DOE.requestPermission()
         if (res !== 'granted') {
-          showToast('Tilt permission denied. Use the buttons!', '#ff3b5c')
+          showToast('Tilt is off. Use the buttons!', '#ff3b5c')
           return
         }
       }
@@ -593,7 +593,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
                 {status !== 'SUBSCRIBED'
                   ? 'Connecting...'
                   : !adminOnline
-                    ? 'Waiting for the host to open the room...'
+                    ? 'Wait. The host opens the room soon.'
                     : waitingNext
                       ? '⏳ Joining next round… watch the big screen!'
                       : "You're in! Look for your dating profile on the big screen."}

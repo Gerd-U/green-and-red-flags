@@ -46,7 +46,7 @@ export const ROUNDS: RoundConfig[] = [
     sabotageFromMs: 15_000,
     pointsMult: 1,
     theme: 'restaurant',
-    tagline: 'Every card shows its true color. Take it easy!',
+    tagline: 'You can see all the colors. Easy!',
   },
   {
     name: 'Getting Serious',
@@ -56,7 +56,7 @@ export const ROUNDS: RoundConfig[] = [
     sabotageFromMs: 5_000,
     pointsMult: 1,
     theme: 'apartment',
-    tagline: 'Half the cards are grey. Read before you catch!',
+    tagline: 'Some cards are grey. Read them first!',
   },
   {
     name: 'Meet the Parents',
@@ -66,7 +66,7 @@ export const ROUNDS: RoundConfig[] = [
     sabotageFromMs: 5_000,
     pointsMult: 2,
     theme: 'dining',
-    tagline: 'All cards are grey, faster, and points count double!',
+    tagline: 'All cards are grey and fast. Double points!',
   },
 ]
 export const TOTAL_ROUNDS = ROUNDS.length
@@ -312,8 +312,8 @@ export interface AwardDef {
 
 export const AWARD_DEFS: AwardDef[] = [
   { id: 'toxic', title: 'Most Toxic', emoji: '☠️', desc: (n) => `caught ${n} red flag${n === 1 ? '' : 's'}` },
-  { id: 'manipulator', title: 'Master Manipulator', emoji: '🧠', desc: (n) => `sent ${n} sabotage${n === 1 ? '' : 's'}` },
-  { id: 'lawyer', title: 'Best Lawyer', emoji: '⚖️', desc: (n) => `${n} "Convinced" vote${n === 1 ? '' : 's'}` },
-  { id: 'victim', title: 'Victim of the Night', emoji: '🥀', desc: (n) => `got sabotaged ${n} time${n === 1 ? '' : 's'}` },
-  { id: 'ick', title: 'The Ick Collector', emoji: '🤢', desc: (n) => `collected ${n} ick${n === 1 ? '' : 's'}` },
+  { id: 'manipulator', title: 'Sneakiest Player', emoji: '🧠', desc: (n) => `attacked others ${n} time${n === 1 ? '' : 's'}` },
+  { id: 'lawyer', title: 'Best Lawyer', emoji: '⚖️', desc: (n) => `got ${n} "yes" vote${n === 1 ? '' : 's'}` },
+  { id: 'victim', title: 'Most Attacked', emoji: '🥀', desc: (n) => `was attacked ${n} time${n === 1 ? '' : 's'}` },
+  { id: 'ick', title: 'Most Icks', emoji: '🤢', desc: (n) => `caught ${n} ick${n === 1 ? '' : 's'}` },
 ]

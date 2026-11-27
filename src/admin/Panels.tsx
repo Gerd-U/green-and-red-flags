@@ -68,7 +68,7 @@ export function Lobby({ players, code, joinUrl, qr, countdown }: { players: Play
           </div>
         ))}
         {players.length === 0 && (
-          <div className="lobby-empty">Scan the code, build your character, pick your dating profile line and press Ready.</div>
+          <div className="lobby-empty">Scan the code. Make your character. Choose a profile line. Tap Ready.</div>
         )}
       </div>
     </div>
@@ -267,7 +267,7 @@ export function Podium({ rows, stats }: { rows: RankRow[]; stats?: PodiumStats }
           )}
         </div>
         <div className="stat green">
-          <div className="stat-label">Most ignored green flag</div>
+          <div className="stat-label">Most missed green flag</div>
           <div className="stat-text">{stats?.topMissedGreen ? `“${stats.topMissedGreen.text}”` : '—'}</div>
           {stats?.topMissedGreen && (
             <div className="stat-sub">

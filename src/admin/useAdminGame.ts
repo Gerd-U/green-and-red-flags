@@ -605,7 +605,7 @@ export function useAdminGame(code: string) {
     s.auto = null
     s.phase = 'playing'
     if (elapsed() < roundConfig(s.round).durationMs) resume()
-    announce('DEFENSE CANCELLED', '#94a3b8', `${name} left the game`)
+    announce('NO DEFENSE', '#94a3b8', `${name} left the game`)
     commit()
   }
 
@@ -819,14 +819,14 @@ export function useAdminGame(code: string) {
         announce('TOXIC!', '#ff3b5c', `${name}: “${m.text}”`, 'red')
       }
     } else if (m.kind === 'green' && m.streak === MAX_STREAK_LEVEL) {
-      announce('HUSBAND/WIFE MATERIAL!', '#22c55e', `${name} is on a x3 combo`, 'combo')
+      announce('PERFECT PARTNER!', '#22c55e', `${name} has a x3 combo`, 'combo')
     } else if (m.kind === 'soulmate') {
       announce('SOULMATE!', '#ffd23f', `${name}: “${m.text}”`, 'soulmate')
     } else if (m.kind === 'ick' && m.text) {
       inc(s.counters.icks, m.id)
       announce('THE ICK!', '#a855f7', `${name}: “${m.text}”`, 'ick')
     }
-    if (m.broke) announce('HEARTBROKEN!', '#ff5fa2', `${name} needs 10 seconds...`, 'red')
+    if (m.broke) announce('HEARTBROKEN!', '#ff5fa2', `${name} waits 10 seconds`, 'red')
   }
 
   const handleMiss = (m: MissMsg) => {
@@ -846,7 +846,7 @@ export function useAdminGame(code: string) {
     const shielded = Boolean(ticks.current[m.to]?.cur?.shield)
     pushFeed({ kind: shielded ? 'blocked' : 'sabotage', pid: m.from, to: m.to, power: m.power, round: s.round })
     if (shielded) {
-      announce('BLOCKED BY THERAPY!', '#22d3ee', `${s.players[m.to].name} was protected`, 'shield')
+      announce('THERAPY SAVED YOU!', '#22d3ee', `${s.players[m.to].name} is safe`, 'shield')
     } else {
       inc(s.counters.received, m.to)
       const row = (s.sabotagePairs[m.from] ??= {})

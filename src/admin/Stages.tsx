@@ -141,12 +141,12 @@ export function FinalThoughts({ stats, players }: { stats?: FinalStats; players:
           {stats?.topRed && <div className="stat-sub">caught by {stats.topRed.count}</div>}
         </div>
         <div className="final-card green">
-          <div className="stat-label">Most ignored green flag</div>
+          <div className="stat-label">Most missed green flag</div>
           <div className="final-text">{stats?.topMissedGreen ? `“${stats.topMissedGreen.text}”` : '—'}</div>
           {stats?.topMissedGreen && <div className="stat-sub">missed by {stats.topMissedGreen.count}</div>}
         </div>
         <div className="final-card hot">
-          <div className="stat-label">Most divided Hot Take</div>
+          <div className="stat-label">Hot Take with the most mixed votes</div>
           <div className="final-text">{stats?.mostDivided ? `“${stats.mostDivided.text}”` : '—'}</div>
           {stats?.mostDivided && (
             <div className="stat-sub">

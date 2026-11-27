@@ -135,23 +135,23 @@ export const SOULMATES: CardText[] = [
 
 /** Ambiguous situations for the Hot Take votes between rounds. */
 export const HOT_TAKES: string[] = [
-  'Wants to share locations',
-  'Still friends with their ex',
-  'Pays for everything',
-  'Checks in every hour',
-  'Posts couple pics every day',
-  'Wants to know all your passwords',
-  'Moves in after three months',
+  'Wants to see your location all the time',
+  'Is still friends with their ex',
+  'Always pays for everything',
+  'Texts you every hour',
+  'Posts couple photos every day',
+  'Wants all your passwords',
+  'Wants to live together after 3 months',
   'Spends every weekend with their mom',
 ]
 
 /** Fallback questions (used if the host script has no data yet). */
 export const DISCUSSION_QUESTIONS: string[] = [
-  'Would you forgive this? Why?',
-  'Is this always a red flag? When is it OK?',
-  'How would you talk to your partner about this?',
-  'Is this worse at 15, 25 or 45 years old?',
-  'Is this a red flag in a friendship too?',
+  'Can you forgive this? Why?',
+  'Is this always bad? When is it OK?',
+  'What can you say to your partner about this?',
+  'Is it worse at 15, 25 or 45?',
+  'Is it a red flag with friends too?',
 ]
 
 export const POWERS: Record<PowerId, Power> = {
@@ -160,42 +160,42 @@ export const POWERS: Record<PowerId, Power> = {
     name: 'Gaslighting',
     emoji: '🌀',
     color: '#a855f7',
-    hint: 'Controls are reversed!',
+    hint: 'Left is right, right is left!',
   },
   ghosting: {
     id: 'ghosting',
     name: 'Ghosting',
     emoji: '👻',
     color: '#94a3b8',
-    hint: 'Where did the cards go?',
+    hint: 'The cards are hiding!',
   },
   lovebombing: {
     id: 'lovebombing',
     name: 'Love bombing',
     emoji: '💘',
     color: '#ff5fa2',
-    hint: 'Every flag looks green...',
+    hint: 'All the cards look green!',
   },
   mixedsignals: {
     id: 'mixedsignals',
     name: 'Mixed signals',
     emoji: '📶',
     color: '#ffb020',
-    hint: 'Everything is falling faster!',
+    hint: 'The cards fall faster!',
   },
   exback: {
     id: 'exback',
     name: 'The ex is back',
     emoji: '🧊',
     color: '#38bdf8',
-    hint: 'You are frozen!',
+    hint: "You can't move!",
   },
   therapy: {
     id: 'therapy',
     name: 'Therapy',
     emoji: '🛡️',
     color: '#22d3ee',
-    hint: 'Shield on: blocks the next sabotage',
+    hint: 'You are safe from the next attack',
   },
 }
 

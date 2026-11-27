@@ -410,10 +410,10 @@ function HostView({ session, onLeave }: { session: HostSession; onLeave: () => v
     case 'hotTake':
       next =
         h?.stage === 'vote'
-          ? { cmd: 'htReveal', label: 'Reveal the votes' }
+          ? { cmd: 'htReveal', label: 'Show the votes' }
           : h?.stage === 'verdict'
             ? { cmd: 'htNext', label: 'Next round' }
-            : { cmd: 'htVerdict', label: "Host's verdict" }
+            : { cmd: 'htVerdict', label: 'Your opinion' }
       break
     case 'awards':
       next = { cmd: 'podium', label: 'Podium' }
