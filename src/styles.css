@@ -4876,3 +4876,40 @@ h2,
   font-size: var(--fs-xxl, 96px);
   line-height: 1;
 }
+.host-app .host-script,
+.host-app .hs-text {
+  color: #fff;
+}
+/* red quote boxes: darker red so white text passes 4.5:1 */
+.quote {
+  background: #c8102e;
+  color: #fff;
+}
+/* lost hearts: grey but still visible (icons need 3:1) */
+.heart {
+  color: #9b90b5;
+}
+.heart.on {
+  color: var(--red);
+}
+/* pink profile bubbles: dark text (white on pink was 2.6:1) */
+.wait-bio,
+.preview-bio,
+.preview-bio .bio-hint {
+  color: #1b1030;
+}
+.ht-bar-red {
+  background: #c8102e;
+  color: #fff;
+}
+/* toasts and power banners: dark box with a colored border (white text was on light colors) */
+.toast,
+.fx-banner {
+  background: #1b1030;
+  color: #fff;
+  border: 3px solid #b9acd6;
+}
+.chip.red {
+  background: #c8102e;
+  color: #fff;
+}

@@ -648,7 +648,7 @@ export default function PlayerGame({ me, avatar, state, sabotage, grant, tilt, b
         </div>
 
         {s.effects.length > 0 && (
-          <div className="fx-banner" style={{ background: POWERS[s.effects[s.effects.length - 1].power].color }}>
+          <div className="fx-banner" style={{ borderColor: POWERS[s.effects[s.effects.length - 1].power].color }}>
             {POWERS[s.effects[s.effects.length - 1].power].emoji} {POWERS[s.effects[s.effects.length - 1].power].hint}
           </div>
         )}

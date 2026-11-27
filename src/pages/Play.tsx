@@ -804,7 +804,7 @@ function PlayerRoom({ me, code, name, avatar, bio, ready, bot, onRename, onEdit,
       </div>
 
       {toast && (
-        <div className="toast" key={toast.key} style={{ background: toast.color }}>
+        <div className="toast" key={toast.key} style={{ borderColor: toast.color }}>
           {toast.text}
         </div>
       )}
