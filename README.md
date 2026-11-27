@@ -1,186 +1,119 @@
-# Green & Red Flags
+# Green & Red Flags: manual del presentador
 
-Juego web multijugador para la actividad de inglés "Green and red flags in a partner". Cada persona arma una personita low poly en su celular y juega un atrapa: agarrar las green flags y esquivar las red flags. El proyector muestra el juego de todos en vivo, y yo, como host, dirijo el debate desde mi celular con un guion que se arma con lo que pasa en la partida.
+Es un juego para la actividad de inglés "Green and red flags in a partner". Cada estudiante arma un personaje en su celular y juega a atrapar tarjetas que caen: las green flags (cosas buenas en una pareja) se atrapan y las red flags (señales de alerta) se esquivan. El proyector muestra el juego de todos al mismo tiempo. Yo, como host, manejo la actividad desde mi celular: avanzo cada parte con un botón y tengo un guion con lo que digo y las preguntas que hago.
 
-Hecho con React, Vite, TypeScript y Supabase Realtime (broadcast y presence). No usa tablas de base de datos.
+La actividad dura unos 27 minutos, con un máximo de 30.
 
-Rutas (nadie las tiene que escribir a mano, salen de la pantalla de inicio):
+Las partes técnicas (instalar, Supabase, Vercel, variables) están en [DEV.md](DEV.md).
 
-- `/` inicio: **Join as player**, **Host a game (big screen)** y **I'm the host**
-- `/admin` proyector (la autoridad del juego)
-- `/play` celular de cada jugador
-- `/host` celular del host (moderador, no juega)
+## Qué necesito
 
-## Guía del presentador (unos 27 minutos)
+- Una compu conectada al proyector, con internet y el navegador abierto en la página del juego.
+- Mi celular (Android con Chrome funciona mejor para las vibraciones).
+- Los celulares de los estudiantes, con internet. No instalan nada.
+- La contraseña de host: **Alfa12** (distingue mayúsculas).
 
-### Antes de empezar
+## Antes de la clase
 
-1. En la compu del proyector abro la app y toco **Host a game (big screen)**. Sale la pantalla "Red flags vs Green flags" con el código de sala.
-2. En mi celular (Android, con Chrome) abro la app y toco **I'm the host**. Escribo el código de sala y la contraseña de host: **`Alfa12`** (o la que haya puesto en `VITE_HOST_PASSWORD`). Distingue mayúsculas; los espacios al inicio y al final no importan. El proyector nunca la muestra.
-3. Toco **Start hosting**. Ese toque es necesario: Chrome en Android solo deja vibrar y sonar a una página después de que la tocaste.
-4. Listo: en el proyector aparece "🎤 Host" y los botones del proyector se esconden. Si mi celular recarga o se bloquea, vuelvo a la vista de host sin escribir nada (solo vuelvo a tocar **Start hosting**). **Leave host** está en el menú ⚙️ y cierra la sesión.
+1. En la compu del proyector abro la página del juego y toco **Host a game (big screen)**. Sale la pantalla de inicio con el código de la sala (4 letras).
+2. En mi celular abro la misma página y toco **I'm the host**. Escribo el código de la sala y la contraseña **Alfa12**.
+3. Toco **Start hosting**. Ese toque es importante: sin él, el celular no puede vibrar.
+4. En el proyector aparece "🎤 Host". Desde ahora manejo todo desde el celular.
+5. Abro el menú ⚙️ y toco **Test cue**: el celular tiene que vibrar y la pantalla tiene que parpadear de colores.
 
-**La pantalla del celular tiene que quedar encendida durante la actividad.** La app lo pide sola con la Wake Lock API; si el navegador no puede (por ejemplo entrando por `http://192.168…` en la misma wifi), sale el aviso "Keep your screen on" y conviene subir el tiempo de bloqueo de pantalla del celular antes de la clase.
+La pantalla del celular tiene que quedar encendida toda la actividad. Si el celular avisa que no puede dejarla encendida solo, conviene subir el tiempo de bloqueo antes de empezar.
 
-### Señales en el celular (cues)
+Si el celular se bloquea o se recarga, vuelvo a la vista de host sin escribir nada; solo toco otra vez **Start hosting**.
 
-El celular me avisa sin tener que mirarlo:
+## Cómo entran los estudiantes
 
-| Tipo | Vibración | Color | Cuándo |
-| --- | --- | --- | --- |
-| 🎤 SPEAK (me toca hablar) | una larga | verde | empieza la intro, se abre el lobby, empieza una defensa, resultados de ronda, se revela el Hot Take, termina el tiempo de un speaker, premios, podio y Final thoughts |
-| 👆 ACT (tocar un botón) | dos cortas | amarillo | faltan 5 s de la defensa (Objection o votación), terminó la votación del Hot Take, todos en Ready en el lobby, faltan 5 s de la ronda |
-| ⚠️ WARN | tres cortas | rojo | voy atrasado según el plan, faltan 3 minutos para los 30, se perdió la conexión |
+Escanean el QR que sale en el proyector. La sala ya viene puesta, así que solo escriben su nombre (máximo 12 letras) y tocan **Next: build your character**. Después arman su personaje (o tocan **🎲 Random**), eligen una frase para su "dating profile" y tocan **Looks good! ✓**. En el proyector se ve quién está listo.
 
-Además del patrón de vibración, el borde de la pantalla parpadea con el color y arriba sale un banner grande con el texto y la pregunta del guion lista. El banner se va con **Got it** o cuando cambia la fase. En el menú ⚙️ quedan los últimos 3 cues por si me perdí uno.
+Si alguien no puede escanear, entra a la dirección que se ve abajo en el proyector y escribe el código.
 
-En el menú ⚙️ de la vista de host hay switches de **Vibration**, **Flash** y **Cue sound** (un ding bajito, apagado por defecto para que la clase no lo escuche) y un botón **Test cue** que dispara los tres tipos seguidos. Conviene probarlo antes de la clase con el celular en la mano. Si se pierde la conexión con el proyector sale un banner rojo "Disconnected — reconnecting…" hasta que vuelve.
+## Mi celular durante la clase
 
-Los cues están en `src/host/cues.ts`: ahí se puede cambiar el texto de cada uno o cuándo se dispara.
+Arriba veo en qué parte vamos, el reloj de la actividad y si voy a tiempo ("On time") o atrasado.
 
-### El proyector
+En el medio está el **guion**, de a un paso por vez:
 
-Arriba: el logo, la ronda con el tiempo grande y el reloj de la actividad. Abajo: el código de sala, la URL corta y un QR pequeño (en la intro y el lobby el QR va grande en el centro). Los botones del proyector están escondidos para que nunca tapen el juego: si muevo el mouse o presiono **H** aparecen 4 segundos en un panel chico en la esquina de abajo a la izquierda (se puede jugar sin celular de host usando ese panel). **New room…** está ahí y pide confirmación.
+- **SAY** (verde): lo que digo yo.
+- **ASK** (amarillo): una pregunta para hacer. El nombre de la persona a quien se la hago aparece resaltado.
+- Abajo dice "Step 2 of 4". Con **Next line** paso al siguiente paso del guion. Ese botón solo mueve el guion, no el juego. Con ◀ vuelvo al paso anterior.
+- Si no me gusta una pregunta, **🔀 Other** la cambia por otra.
+- Cuando el juego pasa a otra parte, el guion vuelve al paso 1.
 
-Durante la ronda, cada jugador tiene una pantallita con forma de celular y el borde de su color: arriba su cabeza, nombre y puntaje; abajo sus corazones. El combo aparece como un badge (x2, x3) solo cuando llega a x2. Las tarjetas se ven con su color pero sin texto, porque son muy chicas para leer. Las pantallitas se ordenan centradas: hasta 4 en una fila, y con más jugadores en dos filas (5 = 3 + 2, 6 = 3 + 3, 7 = 4 + 3, 9 = 5 + 4). A la derecha está el top 5 y debajo el **Live feed** con los últimos 5 eventos en letra grande ("Zoe caught 🚩 Gets jealous of your friends", "Mia used GASLIGHTING on Ana"): ahí la clase lee las situaciones.
+Las preguntas usan nombres y tarjetas reales de la partida, por ejemplo: "Ana, you caught 'Reads your messages'. Can you forgive this one time?".
 
-En mi celular arriba veo el reloj de la actividad, en qué parte vamos y si voy "On time" o atrasado según el plan. Faltando 3 minutos para los 30 sale un aviso rojo. Debajo está el **guion**: lo que digo (Say) y una pregunta para hacer (Ask). Las preguntas usan nombres y tarjetas reales de la partida; con ◀ ▶ veo otra y con **Shuffle** cambio por una de otra persona. El switch **Show script** del menú ⚙️ lo esconde si solo quiero los botones.
+Más abajo está el botón grande **Next**. Siempre dice qué va a pasar ("Next: Open the lobby", "Next: Start vote"…). **Nada avanza solo**: el juego espera a que yo toque Next. Los relojes siguen contando como referencia, y cuando llegan a 0 el proyector muestra "Waiting for the host…". La única excepción es la ronda de juego, que termina sola a los 75 segundos.
 
-Abajo está el botón grande **Next**, que siempre hace el paso que sigue y dice cuál es ("Next: Open the lobby", "Next: Start vote", "Next: Reveal the votes"…). Casi toda la clase se maneja solo con ese botón. Debajo hay una fila de botones más chicos que cambian según la parte: ⏱ Starting soon en el lobby, Pause y End round en la ronda, Objection en la defensa, Skip Hot Take, Go to awards y Play again. Todo entra en la pantalla de un celular de 412×915 sin hacer scroll.
+Debajo del Next hay botones más chicos que cambian según la parte: ⏱ Starting soon (cuenta regresiva de 1 minuto en el lobby), Pause y End round en la ronda, Objection en la defensa, Skip Hot Take y Play again.
 
-### Paso a paso
+## Paso a paso
 
-| Parte | Qué hago | Tiempo |
+| Parte | Qué hago | Qué hace Next |
 | --- | --- | --- |
-| Intro | El guion trae mis puntos: qué es una red flag, qué es una green flag y cómo se juega. Mientras hablo, la gente ya puede entrar. Toco **Open the lobby**. | 2 min |
-| Lobby | Todos entran con el QR (la sala ya viene puesta), escriben su nombre (máximo 12 letras; si se repite se le agrega un número) y arman su personaje. **🎲 Random** arma uno al azar y **Looks good! ✓** los deja listos. Con **⏱ Starting soon** sale en el proyector una cuenta regresiva de 1 minuto. El guion me da preguntas sobre esas frases ("Ana, your profile says..."). Cuando están listos: **Start game**. | 4 min |
-| Tutorial | 20 s. En el proyector salen las reglas completas para explicarlas; en el celular hay una práctica de 3 pasos (atrapar verdes, esquivar rojas, leer las grises) que no suma puntos. Puedo saltarlo. | 0:20 |
-| Ronda 1 "First Date" | Tarjetas con color. La primera red flag después del segundo 10 pausa todo para la defensa. | ~2 min |
-| Defensa | La persona tiene 20 s para defenderse en inglés. **Objection!** suma 10 s con sonido y animación. **Next: Start vote** pasa a la votación cuando yo quiera (10 s). El guion trae 3 preguntas de seguimiento sobre esa tarjeta. | ~45 s |
-| Resultados | Ranking por 15 s y después empieza solo el Hot Take. | 0:15 |
-| Hot Take 1 | Situación ambigua. Todos votan en secreto RED o GREEN (15 s). Se revelan los dos lados con porcentajes. Toco un nombre de cada lado para darle la palabra (30 s cada uno), después **Host's verdict** y doy mi opinión. **Next round** cuando quiera: el Hot Take no avanza solo. Si voy atrasado, **Skip Hot Take**. | ~3 min |
-| Ronda 2 "Getting Serious" | La mitad de las tarjetas caen grises. | ~2 min |
-| Hot Take 2 | Igual que el primero, con otra situación. | ~3 min |
-| Ronda 3 "Meet the Parents" | Todo gris, más rápido y puntos dobles. | ~2 min |
-| Resultados y premios | Most Toxic, Master Manipulator, Best Lawyer, Victim of the Night, The Ick Collector. | ~1 min |
-| Podio | Los 3 primeros. Toco **Final thoughts**. | 1 min |
-| Final thoughts | El proyector muestra la red flag más atrapada, la green más ignorada, el Hot Take más dividido y el jugador más tóxico. El guion me da 3 datos curiosos con la frase lista para decirlos. | ~3 min |
+| Intro | Leo el guion: qué es una red flag y una green flag. La gente ya puede ir entrando. | Abre el lobby |
+| Lobby | Espero a que entren. El guion trae preguntas sobre sus frases de perfil. | Empieza el juego (cuando hay alguien listo) |
+| Tutorial | El proyector explica las reglas y los celulares hacen una práctica de 3 pasos. | Empieza la ronda 1 |
+| Ronda 1 "First Date" | Todas las tarjetas muestran su color. Dura 75 segundos y termina sola. | (la ronda termina sola) |
+| Defensa | Pasa una vez por ronda: alguien que atrapó una red flag la explica en inglés (20 s). **Objection!** le da 10 s más. | Abre la votación, la cierra y vuelve al juego |
+| Resultados | Ranking de la ronda y una pregunta para la clase. | Pasa al Hot Take |
+| Hot Take | Sale una situación y todos votan en secreto: red o green. Después elijo gente de cada lado para hablar (toco su nombre) y doy mi opinión. | Muestra los votos, pasa a "Your opinion" y después a la ronda siguiente |
+| Ronda 2 "Getting Serious" | Algunas tarjetas caen grises: hay que leerlas antes de atraparlas. | |
+| Ronda 3 "Meet the Parents" | Todas grises, más rápido y puntos dobles. | |
+| Premios | Most Toxic, Sneakiest Player, Best Lawyer, Most Attacked y Most Icks. | Podio |
+| Podio | Los 3 primeros. | Final thoughts |
+| Final thoughts | El proyector muestra datos curiosos de la partida y el guion me da las frases. | Fin |
 
-Total planeado: unos 25 minutos más margen. El plan exacto (para el aviso de atraso) está en `PLAN`, en `src/lib/game.ts`. Si la clase se alarga, puedo saltar un Hot Take o bajar las rondas a 60 s (`durationMs`).
+Si voy atrasado, puedo saltar un Hot Take con **Skip Hot Take**.
 
-El proyector también tiene todos los botones, por si el host no está conectado.
+## Las vibraciones
 
-## Reglas
+El celular me avisa sin que tenga que mirarlo:
 
-- **Tarjetas**: máximo 5 palabras, en letra Baloo 2 blanca con borde oscuro para que se lea sobre cualquier color. Caen de a una (nunca dos en la misma fila) y siempre con tiempo para caminar de una a la siguiente: la distancia mínima se calcula con la velocidad del personaje y la de caída. Si dos tarjetas pasan juntas por la altura del personaje, siempre queda un lugar para esquivar las dos. Cuando alguien atrapa una, la frase completa aparece grande 1 segundo en su celular.
-- **Green flag** atrapada: +100. Cada green seguida sube el combo (x1, x1.5, x2, x3). Una red lo reinicia.
-- **Red flag** atrapada: −75 y se pierde un corazón.
-- **Green que se deja pasar**: −25.
-- **Corazones**: 5 por partida. Con 0 quedás "Heartbroken" 10 segundos y volvés con 1 corazón y la mitad del combo.
-- **Soulmate** (dorada, máximo 2 por ronda): +300 y recupera un corazón.
-- **The Ick** (morada): no suma ni resta, solo dispara "THE ICK!" en el proyector y cuenta para el premio.
-- **Poderes**: Gaslighting, Ghosting, Love bombing, Mixed signals y The ex is back duran 5 s y se mandan a otra persona. **Therapy** es un escudo que bloquea el próximo sabotaje.
-- **Dash**: el botón ⚡ Dash entre las flechas, doble toque en una flecha o deslizar rápido el dedo. Tiene 1,2 s de espera.
-- **Entrar tarde**: si alguien entra con la ronda ya empezada, ve "Joining next round" y juega desde la siguiente.
-- **Defensa**: una por ronda. Si la persona que se defiende se desconecta, la defensa se cancela sola y el juego sigue. Si gana "Convinced" (o hay empate) recupera el corazón y los puntos; si no, pierde 100 puntos más.
+| Aviso | Vibración | Color en la pantalla | Qué significa |
+| --- | --- | --- | --- |
+| 🎤 YOUR TURN | una larga | verde | me toca hablar (intro, defensa, resultados, Hot Take, premios, podio, final) |
+| 👆 TAP A BUTTON | dos cortas | amarillo | tengo que tocar algo (todos listos, se terminó un tiempo) |
+| ⚠️ WARNING | tres cortas | rojo | voy atrasado, quedan 3 minutos o se perdió la conexión |
 
-## Qué se puede editar
+Además de vibrar, el borde de la pantalla parpadea con el color y arriba sale un cartel con el texto. El cartel se cierra con **Got it**. Si el celular no vibra, el parpadeo funciona igual.
 
-- `src/lib/game.ts`: todos los tiempos, puntajes, velocidades, tamaño de las tarjetas y el plan de 27 minutos.
-- `src/data/cards.ts`: tarjetas (`short` es lo que cae, máximo 5 palabras; `full` es la frase completa), Hot Takes, Icks y Soulmates.
-- `src/data/host.ts`: el guion del host. Las plantillas usan `{player}`, `{card}`, `{count}`, `{other}`, `{pct}`, etc. Una pregunta solo aparece si todos sus huecos se pueden llenar, así que nunca sale un `{player}` en pantalla.
-- `src/data/profiles.ts`: frases de dating profile.
+En el menú ⚙️ puedo apagar la vibración, el parpadeo o el sonido, esconder el guion, ver los últimos avisos y salir del modo host (**Leave host**).
 
-## Variables de entorno
+## Reglas del juego (para explicar)
 
-| Variable | Para qué |
-| --- | --- |
-| `VITE_SUPABASE_URL` | URL del proyecto de Supabase |
-| `VITE_SUPABASE_ANON_KEY` | anon key del proyecto |
-| `VITE_HOST_PASSWORD` | contraseña del host. Si está vacía se usa **`Alfa12`**. |
-| `VITE_LOCAL_REALTIME` | solo para pruebas en una compu sin Supabase (`1`). No ponerla en Vercel. |
+- Green flag atrapada: +100 puntos. Varias seguidas dan combo (x1.5, x2, x3).
+- Red flag atrapada: −75 puntos y se pierde un corazón.
+- Una green que se deja caer: −25.
+- Cada persona tiene 5 corazones por partida. Con 0 espera 10 segundos y vuelve con 1.
+- Tarjeta dorada (soulmate): +300 y un corazón de vuelta. Tarjeta morada (the ick): no suma ni resta.
+- Poderes: sirven para molestar a otro jugador por 5 segundos (por ejemplo, invertir sus controles). **Therapy** protege del próximo ataque.
+- **⚡ Dash** mueve al personaje rápido hacia un lado.
 
-La contraseña no viaja por la red: el celular del host manda una prueba calculada con ella y el proyector le responde con un token cifrado. Los comandos del host van por un canal privado y llevan ese token; el proyector ignora cualquier comando sin token válido, así que un jugador no puede controlar el juego aunque conozca el código. Ojo: la contraseña por defecto está escrita en el código (y el repo es público), y una variable `VITE_` también queda dentro del código de la página. Alcanza para una clase, no para algo de alta seguridad. Para cambiarla, poné otra en `VITE_HOST_PASSWORD` (en `.env` para local o en las variables de Vercel) y hacé Redeploy.
+## Ensayar con el modo demo
 
-## Correrlo en local
+Para practicar sin estudiantes:
 
-Necesita Node 20 o más nuevo.
+1. Abro el proyector y mi celular de host como en la clase.
+2. Muevo el mouse sobre el proyector (o aprieto la tecla **H**) y aparece un panel chico abajo a la izquierda.
+3. Toco **Open lobby** y después **Demo: add 3 bots** (se puede tocar hasta 3 veces, máximo 9 bots). Los bots tienen la etiqueta **BOT** y juegan solos, cada uno a su manera.
+4. Hago la clase completa con **Next** y el guion, para probar los tiempos y las vibraciones.
+5. Al terminar toco **Remove bots** y **New room…** para empezar la clase con una sala limpia.
 
-```bash
-npm install
-cp .env.example .env     # en Windows: copy .env.example .env
-npm run dev
-```
-
-### Celulares en la misma wifi
-
-```bash
-npm run dev -- --host
-```
-
-Vite muestra una línea `Network: http://192.168.x.x:5173`. El proyector abre esa dirección, toca **Host a game** y los celulares entran a la misma dirección. Si Windows pregunta por el firewall, hay que permitir redes privadas. Inclinar el teléfono en iPhone solo funciona con HTTPS (en Vercel).
-
-### Probar sin Supabase con 7 bots y el host
-
-Con `VITE_LOCAL_REALTIME=1` en `.env` (o `.env.local`), abrí:
-
-```
-http://localhost:5173/dev/bots?room=ABCD&n=7&admin=1&host=1
-```
-
-Arriba se ve el proyector y el celular del host (que entra solo con la contraseña), y abajo 7 bots que juegan, votan y mandan sabotajes. Con `&aw=1280&ah=720` o `&aw=1920&ah=1080` se elige el tamaño del proyector. En modo dev, cada cue del host se registra en la consola como `[cue] SPEAK intro - …`. El código `room=` tiene que ser el que muestra el proyector. Esta página solo existe con `npm run dev`.
-
-Para probar a mano varios jugadores en un navegador: `/play?room=ABCD&pid=2`, `/play?room=ABCD&pid=3`, etc.
-
-Para revisar cómo se ve en distintos celulares está `/dev/phones?room=ABCD`: muestra la misma pantalla en 320×568, 360×640, 360×740, 390×844, 412×915 y 740×360 (acostado). Con `&bot=1` cada celular es un bot que juega solo, con `&host=1` son celulares de host y con `&admin=1` se agrega el proyector. También es solo para `npm run dev`.
-
-## Modo demo (bots en el proyector)
-
-En el panel escondido del proyector (mover el mouse o presionar **H**) está el botón **Demo: add 3 bots**. Agrega 3 jugadores que juegan solos, con nombre y personaje al azar y la etiqueta **BOT** en el lobby, en las pantallas y en el ranking. Se puede tocar varias veces (hasta 9 bots). **Remove bots** los saca.
-
-Funciona en producción (Vercel con Supabase), no solo en `npm run dev`: cada bot es la página normal del jugador, abierta en tamaño de celular (360×740), achicada y casi invisible en una esquina del proyector, con el mismo piloto automático que usa `/dev/bots`. Por eso los bots solo juegan mientras la página del proyector está abierta y visible.
-
-Cada bot tiene su propia forma de jugar, sacada de su id al azar: qué tan rápido reacciona, qué tan lejos mira, cuántas veces se equivoca, qué tan bien adivina las grises, si le da pereza caminar lejos y si usa el Dash. Así no se mueven todos igual y el ensayo se parece a una partida de verdad (en la ronda 1 atrapan casi todas las verdes; en las grises se equivocan más, como la gente).
-
-## Ensayar antes de la clase
-
-1. Abro el proyector en la compu y el celular de host como en la clase.
-2. Toco **Open the lobby** y después **Demo: add 3 bots** (una o dos veces).
-3. Hago la clase completa con el botón **Next** del celular: así pruebo las vibraciones, el guion y los tiempos sin alumnos. Con mi propio celular también puedo entrar como jugador para ver qué ven ellos.
-4. Al final toco **Remove bots** y **New room…** para que la clase empiece con una sala limpia.
-
-Para probar el modo demo en la compu sin Supabase: con `VITE_LOCAL_REALTIME=1` en `.env.local` corro `npm run build` y `npm run preview`, y abro `http://localhost:4173/admin`. Esa variable nunca va en Vercel (`.env.local` no se sube al repo).
+Los bots juegan solo mientras la página del proyector está abierta y visible.
 
 ## Música
 
-La música del proyector se genera con Web Audio (batería, bajo, acordes suaves y una melodía corta con eco), con un estilo por parte:
+El proyector tiene música propia, distinta en cada parte (más tranquila en el lobby y más rápida en la última ronda). Baja sola cuando alguien habla. El botón **🎵 Music** del panel la apaga o la prende. Para usar canciones propias sin derechos de autor (por ejemplo de Pixabay Music), ver [DEV.md](DEV.md).
 
-| Parte | Estilo |
-| --- | --- |
-| Intro, lobby y tutorial | pop latino tranquilo, 95 BPM |
-| Ronda 1 "First Date" | reguetón (dembow), 95 BPM |
-| Ronda 2 "Getting Serious" | dance pop, 118 BPM |
-| Ronda 3 "Meet the Parents" | electro, 128 BPM, que sube de energía en los últimos 10 segundos |
-| Premios, podio y Final thoughts | celebración, 120 BPM |
+## Si algo falla
 
-La música baja sola durante las defensas, el Hot Take, los resultados, la intro y Final thoughts (cuando hablo yo). El botón **🎵 Music** del panel la apaga o la prende.
-
-Para usar canciones de verdad, se ponen en `public/music/` con estos nombres: `lobby.mp3`, `round1.mp3`, `round2.mp3`, `round3.mp3` y `podium.mp3`. Si un archivo existe se usa ese (con un fade entre canciones); si no, suena la generada para esa parte. Pueden ser canciones de Pixabay Music u otra fuente sin derechos de autor. No hay que subir al repo canciones con copyright.
-
-## Crear el proyecto en Supabase
-
-1. Entrar a https://supabase.com, crear una cuenta y un proyecto nuevo (el plan gratis alcanza).
-2. Ir a Project Settings > API (o al botón "Connect").
-3. Copiar el "Project URL" en `VITE_SUPABASE_URL` y la clave "anon public" (o "publishable key") en `VITE_SUPABASE_ANON_KEY`.
-
-No hay que crear tablas. Si en Realtime > Settings existe la opción de permitir solo canales privados, tiene que quedar desactivada.
-
-El plan gratis permite 100 mensajes por segundo. Cada celular manda unas 7 actualizaciones por segundo y solo al proyector, así que 7 jugadores usan unos 50 por segundo. El host manda muy pocos mensajes.
-
-## Desplegar en Vercel
-
-1. En https://vercel.com, "Add New > Project" e importar el repo `green-and-red-flags`.
-2. Antes de darle Deploy, en "Environment Variables" agregar `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` y, si quiero otra contraseña que no sea `Alfa12`, `VITE_HOST_PASSWORD`.
-3. Deploy. `vercel.json` ya redirige todas las rutas a `index.html`.
-
-Si cambio las variables después, hay que hacer "Redeploy".
+- **Mi celular no vibra.** Abro ⚙️. Si dice "Vibration API: no", ese navegador no puede vibrar (pasa en iPhone), pero el parpadeo sigue funcionando. Si dice "Last call: false", el celular bloqueó la vibración: reviso que no esté en silencio, en No molestar ni en ahorro de batería, y que la vibración esté activada en los ajustes del teléfono. También reviso que el switch **Vibration** esté prendido y que haya tocado **Start hosting**.
+- **Mi celular dice "Disconnected".** Espero unos segundos; se reconecta solo. Si no, recargo la página y toco **Start hosting**.
+- **Un estudiante no puede entrar.** Reviso que tenga internet y que escriba bien el código. Si entra con la ronda empezada, ve "Joining next round" y juega desde la ronda siguiente.
+- **Un celular dice "Reconnecting…".** Normalmente vuelve solo. Si tarda, que recargue la página: vuelve con su personaje.
+- **Se recargó el proyector.** La partida vuelve donde estaba, en pausa. Toco Next o Resume para seguir.
+- **No entra la contraseña.** Es **Alfa12**, con A mayúscula.
+- **Quiero empezar de cero.** En el panel del proyector, **New room…** (pide confirmación). Los estudiantes tienen que entrar con el código nuevo.
