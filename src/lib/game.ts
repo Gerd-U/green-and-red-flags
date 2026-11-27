@@ -167,6 +167,18 @@ export const REACTION_MS = 350
  */
 export const minCardGapMs = (dx: number) => REACTION_MS + Math.abs(dx) / MOVE_SPEED
 
+/** height of the band where a card can touch the body (body + card), as a share of the field */
+const CATCH_BAND = PLAYER_H + 0.05 + CARD_H
+
+/** true when some spot of the field is out of reach of both cards (you can dodge both) */
+function canDodgeBoth(a: number, b: number): boolean {
+  const safe = HIT_DX + 0.02
+  for (let p = PLAYER_W / 2; p <= 1 - PLAYER_W / 2; p += 0.01) {
+    if (Math.abs(p - a) >= safe && Math.abs(p - b) >= safe) return true
+  }
+  return false
+}
+
 /**
  * Builds the cards of one round. The deck order comes from `gameSeed`
  * (fixed for the whole game, so the 3 rounds never repeat a card) and the
@@ -217,19 +229,32 @@ export function buildSchedule(seed: number, round: number, gameSeed: number): Sc
   const xs: number[] = []
   let lastX = 0.5
   for (let i = 0; i < order.length; i++) {
-    let x = minX + rand() * span
-    if (Math.abs(x - lastX) < 0.12) x = x > 0.5 ? x - 0.22 : x + 0.22
-    x = Math.max(minX, Math.min(1 - minX, x))
+    const pick = () => {
+      let x = minX + rand() * span
+      if (Math.abs(x - lastX) < 0.12) x = x > 0.5 ? x - 0.22 : x + 0.22
+      return Math.max(minX, Math.min(1 - minX, x))
+    }
+    let x = pick()
+    if (i > 0) {
+      const prevX = xs[i - 1]
+      const prevArrive = times[i - 1] + fallAt(times[i - 1])
+      // the previous card is still in the catch band when this one arrives?
+      // then place this one so there is always a spot that avoids both
+      const bandMs = CATCH_BAND * fallAt(times[i - 1])
+      const overlaps = () => times[i] + fallAt(times[i]) - prevArrive < bandMs + REACTION_MS
+      if (overlaps()) {
+        for (let k = 0; k < 12 && !canDodgeBoth(prevX, x); k++) x = pick()
+        if (!canDodgeBoth(prevX, x)) times[i] = prevArrive + bandMs + REACTION_MS - fallAt(times[i]) + 5
+      }
+      const need = minCardGapMs(x - prevX)
+      for (let k = 0; k < 3; k++) {
+        const gap = times[i] + fallAt(times[i]) - prevArrive
+        if (gap >= need) break
+        times[i] += need - gap + 5
+      }
+    }
     xs.push(x)
     lastX = x
-    if (i === 0) continue
-    const need = minCardGapMs(x - xs[i - 1])
-    const prevArrive = times[i - 1] + fallAt(times[i - 1])
-    for (let k = 0; k < 3; k++) {
-      const gap = times[i] + fallAt(times[i]) - prevArrive
-      if (gap >= need) break
-      times[i] += need - gap + 5
-    }
   }
 
   const cards: ScheduledCard[] = []
